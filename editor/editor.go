@@ -33,28 +33,36 @@ func NewEditor(app *gfx.App) *Editor {
 	return e
 }
 
+func (e *Editor) isDown1(key1 glfw.Key) bool {
+	return e.app.IsFirstDown(key1) || e.app.IsDownMod(key1, glfw.ModShift)
+}
+
+func (e *Editor) isDown(key1, key2 glfw.Key) bool {
+	return e.isDown1(key1) || e.isDown1(key2)
+}
+
 func (e *Editor) Events() {
-	if (e.app.IsFirstDown(glfw.KeyUp) || e.app.IsDownMod(glfw.KeyUp, glfw.ModShift)) && e.shapeSelectorIndex > 0 {
+	if e.isDown1(glfw.KeyLeftBracket) && e.shapeSelectorIndex > 0 {
 		e.shapeSelectorIndex--
 		e.shapeSelectorUpdate = true
 	}
-	if (e.app.IsFirstDown(glfw.KeyDown) || e.app.IsDownMod(glfw.KeyDown, glfw.ModShift)) && e.shapeSelectorIndex < len(shapes.Shapes)-1 {
+	if e.isDown1(glfw.KeyRightBracket) && e.shapeSelectorIndex < len(shapes.Shapes)-1 {
 		e.shapeSelectorIndex++
 		e.shapeSelectorUpdate = true
 	}
-	if (e.app.IsFirstDown(glfw.KeyA) || e.app.IsDownMod(glfw.KeyA, glfw.ModShift)) && e.app.Loader.X > 0 {
+	if e.isDown(glfw.KeyA, glfw.KeyLeft) && e.app.Loader.X > 0 {
 		e.app.Loader.X++
 		e.reload = true
 	}
-	if e.app.IsFirstDown(glfw.KeyD) || e.app.IsDownMod(glfw.KeyD, glfw.ModShift) {
+	if e.isDown(glfw.KeyD, glfw.KeyRight) {
 		e.app.Loader.X--
 		e.reload = true
 	}
-	if (e.app.IsFirstDown(glfw.KeyW) || e.app.IsDownMod(glfw.KeyW, glfw.ModShift)) && e.app.Loader.Y > 0 {
+	if e.isDown(glfw.KeyW, glfw.KeyUp) && e.app.Loader.Y > 0 {
 		e.app.Loader.Y--
 		e.reload = true
 	}
-	if e.app.IsFirstDown(glfw.KeyS) || e.app.IsDownMod(glfw.KeyS, glfw.ModShift) {
+	if e.isDown(glfw.KeyS, glfw.KeyDown) {
 		e.app.Loader.Y++
 		e.reload = true
 	}
@@ -62,20 +70,28 @@ func (e *Editor) Events() {
 		e.app.Loader.SetShape(e.app.Loader.X, e.app.Loader.Y, e.Z, byte(e.shapeSelectorIndex))
 		e.reload = true
 	}
+	if e.app.IsFirstDown(glfw.KeyE) && e.Z > 0 {
+		shapes.Shapes[e.shapeSelectorIndex].Traverse(func(xx, yy, zz int) {
+			if zz == 0 {
+				e.app.Loader.EraseShape(e.app.Loader.X+xx, e.app.Loader.Y+yy, e.Z-1)
+			}
+		})
+		e.reload = true
+	}
 	if e.app.IsFirstDown(glfw.KeyX) {
 		e.app.Loader.SaveAll()
 	}
 
 	if e.shapeSelectorUpdate || e.reload {
-		e.Z = e.findTop(e.shapeSelectorIndex)
+		e.Z = e.findTop()
 		e.app.View.SetCursor(e.shapeSelectorIndex, e.Z)
 		e.reload = true
 	}
 }
 
-func (e *Editor) findTop(shapeIndex int) int {
+func (e *Editor) findTop() int {
 	lastZ := e.Z
-	shape := shapes.Shapes[shapeIndex]
+	shape := shapes.Shapes[e.shapeSelectorIndex]
 	for x := 0; x < int(shape.Size[0]); x++ {
 		for y := 0; y < int(shape.Size[1]); y++ {
 			for z := world.SECTION_Z_SIZE - 1; z >= 0; z-- {

@@ -12,6 +12,13 @@ For graphics, isongn uses opengl. Instead of sorting isometric shapes [using the
 
 isongn is written in Go with minimal dependencies so it should run on all platforms.
 
+## How to use isongn
+
+This section will be expanded with more information as it becomes available.
+- Create an `images` directory consisting of your tiles (see examples in this repo). 
+   - I'd recommend working with an isometric grid of about 26.57 degree angles which would make your triangles about x=1,y=2 size - easy to measure.
+   - Also create the `images/shapes.json` file (see [example](images/shapes.json)), describing your tileset(s).
+
 ## Plans!
 
 Currently only a basic editor is supported however, coming soon I plan to add:
@@ -20,4 +27,4 @@ Currently only a basic editor is supported however, coming soon I plan to add:
 - creatures/animated blocks
 - intelligent/scripted editor (walls/beaches/etc)
 
-2021 (c) Gabor Torok
+2021 (c) Gabor Torok, MIT License
