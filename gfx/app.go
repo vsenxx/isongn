@@ -1,10 +1,13 @@
 package gfx
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
@@ -26,7 +29,18 @@ type KeyPress struct {
 	First    bool
 }
 
+type AppConfig struct {
+	GameDir    string
+	Title      string
+	Name       string
+	Version    float64
+	ViewSize   int
+	ViewSizeZ  int
+	SectorSize int
+}
+
 type App struct {
+	Config     *AppConfig
 	Window     *glfw.Window
 	KeyState   map[glfw.Key]*KeyPress
 	targetFps  float64
@@ -38,12 +52,14 @@ type App struct {
 	Loader     *world.Loader
 }
 
-func NewApp(windowWidth, windowHeight int, targetFps float64) *App {
+func NewApp(gameDir string, windowWidth, windowHeight int, targetFps float64) *App {
+	appConfig := parseConfig(gameDir)
 	app := &App{
+		Config:    appConfig,
 		KeyState:  map[glfw.Key]*KeyPress{},
 		targetFps: targetFps,
 	}
-	app.Dir = initUserdir()
+	app.Dir = initUserdir(appConfig.Name)
 	app.Window = initWindow(windowWidth, windowHeight)
 	app.Window.SetKeyCallback(app.Keypressed)
 	app.Window.SetScrollCallback(app.MouseScroll)
@@ -57,13 +73,39 @@ func NewApp(windowWidth, windowHeight int, targetFps float64) *App {
 	return app
 }
 
-func initUserdir() string {
+func parseConfig(gameDir string) *AppConfig {
+	bytes, err := ioutil.ReadFile(filepath.Join(gameDir, "config.json"))
+	if err != nil {
+		panic(err)
+	}
+	data := map[string]interface{}{}
+	err = json.Unmarshal(bytes, &data)
+	if err != nil {
+		panic(err)
+	}
+
+	view := data["view"].(map[string]interface{})
+	config := &AppConfig{
+		GameDir:    gameDir,
+		Title:      data["title"].(string),
+		Name:       strings.ToLower(data["name"].(string)),
+		Version:    data["version"].(float64),
+		ViewSize:   int(view["size"].(float64)),
+		ViewSizeZ:  int(view["sizeZ"].(float64)),
+		SectorSize: int(view["sector"].(float64)),
+	}
+	fmt.Printf("Starting game: %s (v%f)\n", config.Title, config.Version)
+	return config
+}
+
+func initUserdir(gameName string) string {
 	// create user dir if needed
 	userHomeDir, err := os.UserHomeDir()
 	if err != nil {
 		log.Fatal(err)
 	}
-	dir := filepath.Join(userHomeDir, ".isongn")
+	dir := filepath.Join(userHomeDir, "."+gameName)
+	fmt.Printf("Game state path: %s\n", dir)
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		os.Mkdir(dir, os.ModePerm)
 	}
@@ -144,7 +186,7 @@ func (app *App) CalcFps() {
 	delta := currentTime - app.lastUpdate
 	app.nbFrames++
 	if delta >= 1.0 { // If last cout was more than 1 sec ago
-		app.Window.SetTitle(fmt.Sprintf("isongn FPS: %.2f", float64(app.nbFrames)/delta))
+		app.Window.SetTitle(fmt.Sprintf("%s - %.2f", app.Config.Title, float64(app.nbFrames)/delta))
 		app.nbFrames = 0
 		app.lastUpdate = currentTime
 	}

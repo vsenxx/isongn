@@ -1,0 +1,10 @@
+{
+    "title": "Escape from Enilar",
+    "name": "enilar",
+    "version": 0.1,
+    "view": {
+        "size": 64,
+        "sizeZ": 32,
+        "sector": 400
+    }
+}

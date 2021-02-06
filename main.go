@@ -6,6 +6,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"runtime"
 
@@ -20,11 +21,17 @@ func init() {
 }
 
 func main() {
+	game := flag.String("game", ".", "Location of the game assets directory")
+	width := flag.Int("width", 800, "Screen width")
+	height := flag.Int("height", 600, "Screen height")
+	fps := flag.Float64("fps", 60, "Frames per second")
+	flag.Parse()
+
 	if err := glfw.Init(); err != nil {
 		log.Fatalln("failed to initialize glfw:", err)
 	}
 	defer glfw.Terminate()
 
-	app := gfx.NewApp(800, 600, 60)
+	app := gfx.NewApp(*game, *width, *height, *fps)
 	app.Run(editor.NewEditor(app))
 }
