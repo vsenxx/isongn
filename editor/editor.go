@@ -28,7 +28,7 @@ func NewEditor(app *gfx.App) *Editor {
 	}
 
 	// add a ui
-	app.Ui.Add(650, 0, 150, 600, e.shapeSelectorContents)
+	app.Ui.Add(int(app.Width)-150, 0, 150, int(app.Height), e.shapeSelectorContents)
 
 	return e
 }

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-gl/gl/v4.1-core/gl"
+	"github.com/go-gl/gl/all-core/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
 	"github.com/uzudil/isongn/shapes"
 	"github.com/uzudil/isongn/world"
@@ -40,35 +40,51 @@ type AppConfig struct {
 }
 
 type App struct {
-	Config     *AppConfig
-	Window     *glfw.Window
-	KeyState   map[glfw.Key]*KeyPress
-	targetFps  float64
-	lastUpdate float64
-	nbFrames   int
-	View       *View
-	Ui         *Ui
-	Dir        string
-	Loader     *world.Loader
+	Config                          *AppConfig
+	Window                          *glfw.Window
+	KeyState                        map[glfw.Key]*KeyPress
+	targetFps                       float64
+	lastUpdate                      float64
+	nbFrames                        int
+	View                            *View
+	Ui                              *Ui
+	Dir                             string
+	Loader                          *world.Loader
+	Width, Height                   int
+	windowWidth, windowHeight       int
+	windowWidthDpi, windowHeightDpi int
+	dpiX, dpiY                      float32
+	frameBuffer                     *FrameBuffer
 }
 
-func NewApp(gameDir string, windowWidth, windowHeight int, targetFps float64) *App {
+func NewApp(gameDir string, width, height, windowWidth, windowHeight int, targetFps float64) *App {
 	appConfig := parseConfig(gameDir)
 	app := &App{
-		Config:    appConfig,
-		KeyState:  map[glfw.Key]*KeyPress{},
-		targetFps: targetFps,
+		Config:       appConfig,
+		KeyState:     map[glfw.Key]*KeyPress{},
+		targetFps:    targetFps,
+		Width:        width,
+		Height:       height,
+		windowWidth:  windowWidth,
+		windowHeight: windowHeight,
 	}
 	app.Dir = initUserdir(appConfig.Name)
 	app.Window = initWindow(windowWidth, windowHeight)
+	pxWidth, pxHeight := app.Window.GetFramebufferSize()
+	app.dpiX = float32(pxWidth) / float32(windowWidth)
+	app.dpiY = float32(pxHeight) / float32(windowHeight)
+	fmt.Printf("Resolution: %dx%d Window: %dx%d Dpi: %fx%f\n", app.Width, app.Height, windowWidth, windowHeight, app.dpiX, app.dpiY)
+	app.windowWidthDpi = int(float32(app.windowWidth) * app.dpiX)
+	app.windowHeightDpi = int(float32(app.windowHeight) * app.dpiY)
 	app.Window.SetKeyCallback(app.Keypressed)
 	app.Window.SetScrollCallback(app.MouseScroll)
+	app.frameBuffer = NewFrameBuffer(int32(width), int32(height))
 	err := shapes.InitShapes()
 	if err != nil {
 		panic(err)
 	}
 	app.View = InitView()
-	app.Ui = InitUi(windowWidth, windowHeight)
+	app.Ui = InitUi(width, height)
 	app.Loader = world.NewLoader(app.Dir, 1000, 1000)
 	return app
 }
@@ -216,8 +232,15 @@ func (app *App) Run(game Game) {
 		// show FPS in window title
 		app.CalcFps()
 
+		// set to render to frame buffer
+		app.frameBuffer.Enable(app.Width, app.Height)
+
+		// render game
 		game.Events()
 		game.Draw()
+
+		// render framebuffer to screen
+		app.frameBuffer.Draw(app.windowWidthDpi, app.windowHeightDpi)
 
 		// Maintenance
 		app.Window.SwapBuffers()

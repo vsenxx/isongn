@@ -336,7 +336,7 @@ var fragmentShader = `
 #version 330
 uniform sampler2D tex;
 in vec2 fragTexCoord;
-out vec4 outputColor;
+layout(location = 0) out vec4 outputColor;
 void main() {
 	vec4 val = texture(tex, fragTexCoord);
 	if (val.a > 0.5) {

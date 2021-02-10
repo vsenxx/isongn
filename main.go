@@ -22,8 +22,10 @@ func init() {
 
 func main() {
 	game := flag.String("game", ".", "Location of the game assets directory")
-	width := flag.Int("width", 800, "Screen width")
-	height := flag.Int("height", 600, "Screen height")
+	width := flag.Int("width", 320, "Screen width (default: 320)")
+	height := flag.Int("height", 240, "Screen height (default: 200)")
+	winWidth := flag.Int("winwidth", 800, "Window width (default: 800)")
+	winHeight := flag.Int("winheight", 600, "Window height (default: 600)")
 	fps := flag.Float64("fps", 60, "Frames per second")
 	flag.Parse()
 
@@ -32,6 +34,6 @@ func main() {
 	}
 	defer glfw.Terminate()
 
-	app := gfx.NewApp(*game, *width, *height, *fps)
+	app := gfx.NewApp(*game, *width, *height, *winWidth, *winHeight, *fps)
 	app.Run(editor.NewEditor(app))
 }

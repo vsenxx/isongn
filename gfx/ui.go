@@ -16,7 +16,7 @@ type Ui struct {
 	textureUniform            int32
 	vertAttrib                uint32
 	texCoordAttrib            uint32
-	screenWidth, screenHeight float32
+	ScreenWidth, ScreenHeight float32
 	vao                       uint32
 	panels                    []*Panel
 }
@@ -39,8 +39,8 @@ func InitUi(screenWidth, screenHeight int) *Ui {
 	}
 
 	ui := &Ui{
-		screenWidth:  float32(screenWidth),
-		screenHeight: float32(screenHeight),
+		ScreenWidth:  float32(screenWidth),
+		ScreenHeight: float32(screenHeight),
 		panels:       []*Panel{},
 	}
 	program, err := NewProgram(uiVertexShader, uiFragmentShader)
@@ -111,12 +111,12 @@ func (ui *Ui) NewPanel(x, y, w, h int, renderer func(*Panel) bool) *Panel {
 	fh := float32(h)
 	panel.model = mgl32.Ident4()
 	// translate to position
-	panel.model.Set(0, 3, (fx*2-(ui.screenWidth-fw))/ui.screenWidth)
-	panel.model.Set(1, 3, ((ui.screenHeight-fh)-fy*2)/ui.screenHeight)
+	panel.model.Set(0, 3, (fx*2-(ui.ScreenWidth-fw))/ui.ScreenWidth)
+	panel.model.Set(1, 3, ((ui.ScreenHeight-fh)-fy*2)/ui.ScreenHeight)
 	panel.model.Set(2, 3, 0)
 	// scale
-	panel.model.Set(0, 0, fw/ui.screenWidth)
-	panel.model.Set(1, 1, fh/ui.screenHeight)
+	panel.model.Set(0, 0, fw/ui.ScreenWidth)
+	panel.model.Set(1, 1, fh/ui.ScreenHeight)
 	panel.model.Set(2, 2, 1)
 
 	gl.BindVertexArray(ui.vao)
@@ -199,7 +199,7 @@ var uiFragmentShader = `
 #version 330
 uniform sampler2D tex;
 in vec2 fragTexCoord;
-out vec4 outputColor;
+layout(location = 0) out vec4 outputColor;
 void main() {
 	vec4 val = texture(tex, fragTexCoord);
 	outputColor = val;
