@@ -53,6 +53,15 @@ type View struct {
 const viewSize = 10
 const SIZE = 64
 
+func getProjection(zoom float32) mgl32.Mat4 {
+	projection := mgl32.Ortho(-viewSize*zoom*0.95, viewSize*zoom*0.95, -viewSize*zoom*0.95, viewSize*zoom*0.95, -viewSize*zoom*2, viewSize*zoom*2)
+	shear := mgl32.Ident4()
+	shear.Set(0, 2, 0)
+	shear.Set(1, 2, -2)
+	projection = shear.Mul4(projection)
+	return projection
+}
+
 func InitView() *View {
 	// does this have to be called in every file?
 	var err error
@@ -63,9 +72,10 @@ func InitView() *View {
 	view := &View{
 		zoom: 1,
 	}
-	view.projection = mgl32.Ortho(-viewSize*0.95, viewSize*0.95, -viewSize*0.95, viewSize*0.95, -viewSize*2, viewSize*2)
+	view.projection = getProjection(1)
+
 	// coordinate system: Z is up
-	view.camera = mgl32.LookAtV(mgl32.Vec3{1, 1, 2}, mgl32.Vec3{0, 0, 0}, mgl32.Vec3{0, 0, 1})
+	view.camera = mgl32.LookAtV(mgl32.Vec3{0.001, 0.001, 1}, mgl32.Vec3{0, 0, 0}, mgl32.Vec3{0, 0, 1})
 
 	// Configure the vertex and fragment shaders
 	view.program, err = NewProgram(vertexShader, fragmentShader)
@@ -201,23 +211,23 @@ func (b *Block) vertices() []float32 {
 	//      x     y
 	w := b.sizeX
 	h := b.sizeY
-	d := b.sizeZ
+	d := b.sizeZ * 2
 
 	// total width/height of texture
-	tx := h*2 + w*2
-	ty := h + d*2 + w
+	tx := h + w
+	ty := h + d + w
 
 	// fudge factor for edges
 	var f float32 = b.shape.Fudge
 
 	points := []float32{
 		w, 0, d, f, w / ty,
-		w, 0, 0, f, (w + d*2) / ty,
-		w, h, 0, (h * 2) / tx, 1 - f,
-		0, h, 0, 1 - f, (h + d*2) / ty,
+		w, 0, 0, f, (w + d) / ty,
+		w, h, 0, (h) / tx, 1 - f,
+		0, h, 0, 1 - f, (h + d) / ty,
 		0, h, d, 1 - f, h / ty,
-		0, 0, d, (w * 2) / tx, f,
-		w, h, d, (h * 2) / tx, (h + w) / ty,
+		0, 0, d, (w) / tx, f,
+		w, h, d, (h) / tx, (h + w) / ty,
 	}
 
 	// scale and translate tex coords to within larger texture
@@ -312,8 +322,7 @@ func (b *BlockPos) Draw(view *View) {
 func (view *View) Zoom(zoom float64) {
 	view.zoom = math.Min(math.Max(view.zoom-zoom*0.1, 0.35), 16)
 	// fmt.Printf("zoom:%f\n", view.zoom)
-	z := float32(view.zoom)
-	view.projection = mgl32.Ortho(-viewSize*z*0.95, viewSize*z*0.95, -viewSize*z*0.95, viewSize*z*0.95, -viewSize*z*2, viewSize*z*2)
+	view.projection = getProjection(float32(view.zoom))
 	gl.UseProgram(view.program)
 	gl.UniformMatrix4fv(view.projectionUniform, 1, false, &view.projection[0])
 }

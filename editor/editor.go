@@ -20,17 +20,21 @@ type Editor struct {
 	Z                   int
 }
 
-func NewEditor(app *gfx.App) *Editor {
-	e := &Editor{
-		app:                 app,
+func NewEditor() *Editor {
+	return &Editor{
 		shapeSelectorUpdate: true,
 		reload:              true,
 	}
+}
 
+func (e *Editor) Init(app *gfx.App) {
+	e.app = app
 	// add a ui
-	app.Ui.Add(int(app.Width)-150, 0, 150, int(app.Height), e.shapeSelectorContents)
+	e.app.Ui.Add(int(e.app.Width)-150, 0, 150, int(e.app.Height), e.shapeSelectorContents)
+}
 
-	return e
+func (e *Editor) GetResolution() (int, int) {
+	return 1024, 768
 }
 
 func (e *Editor) isDown1(key1 glfw.Key) bool {

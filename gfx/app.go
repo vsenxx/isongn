@@ -17,6 +17,8 @@ import (
 )
 
 type Game interface {
+	Init(app *App)
+	GetResolution() (int, int)
 	Events()
 	Draw()
 }
@@ -40,6 +42,7 @@ type AppConfig struct {
 }
 
 type App struct {
+	Game                            Game
 	Config                          *AppConfig
 	Window                          *glfw.Window
 	KeyState                        map[glfw.Key]*KeyPress
@@ -57,9 +60,11 @@ type App struct {
 	frameBuffer                     *FrameBuffer
 }
 
-func NewApp(gameDir string, width, height, windowWidth, windowHeight int, targetFps float64) *App {
+func NewApp(game Game, gameDir string, windowWidth, windowHeight int, targetFps float64) *App {
+	width, height := game.GetResolution()
 	appConfig := parseConfig(gameDir)
 	app := &App{
+		Game:         game,
 		Config:       appConfig,
 		KeyState:     map[glfw.Key]*KeyPress{},
 		targetFps:    targetFps,
@@ -218,7 +223,10 @@ func (app *App) Sleep(lastTime float64) float64 {
 	return now
 }
 
-func (app *App) Run(game Game) {
+func (app *App) Run() {
+
+	app.Game.Init(app)
+
 	// Configure global settings
 	gl.Enable(gl.DEPTH_TEST)
 	gl.DepthFunc(gl.LESS)
@@ -236,8 +244,8 @@ func (app *App) Run(game Game) {
 		app.frameBuffer.Enable(app.Width, app.Height)
 
 		// render game
-		game.Events()
-		game.Draw()
+		app.Game.Events()
+		app.Game.Draw()
 
 		// render framebuffer to screen
 		app.frameBuffer.Draw(app.windowWidthDpi, app.windowHeightDpi)

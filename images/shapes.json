@@ -21,8 +21,8 @@
         },
         "dpi": 288,
         "shapes": [
-            { "name": "orange", "pos": [10, 5], "size": [1, 1, 1] },
-            { "name": "green", "pos": [25, 5], "size": [2, 2, 1] }
+            { "name": "orange", "pos": [10, 5], "size": [1, 1, 2] },
+            { "name": "green", "pos": [25, 5], "size": [2, 2, 2] }
         ]
     },
     {
