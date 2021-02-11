@@ -65,7 +65,7 @@ func InitView() *View {
 	}
 	view.projection = mgl32.Ortho(-viewSize*0.95, viewSize*0.95, -viewSize*0.95, viewSize*0.95, -viewSize*2, viewSize*2)
 	// coordinate system: Z is up
-	view.camera = mgl32.LookAtV(mgl32.Vec3{1, 1, 1.2}, mgl32.Vec3{0, 0, 0}, mgl32.Vec3{0, 0, 1})
+	view.camera = mgl32.LookAtV(mgl32.Vec3{1, 1, 2}, mgl32.Vec3{0, 0, 0}, mgl32.Vec3{0, 0, 1})
 
 	// Configure the vertex and fragment shaders
 	view.program, err = NewProgram(vertexShader, fragmentShader)
