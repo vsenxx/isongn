@@ -16,14 +16,12 @@ type Editor struct {
 	app                 *gfx.App
 	shapeSelectorIndex  int
 	shapeSelectorUpdate bool
-	reload              bool
 	Z                   int
 }
 
 func NewEditor() *Editor {
 	return &Editor{
 		shapeSelectorUpdate: true,
-		reload:              true,
 	}
 }
 
@@ -33,46 +31,37 @@ func (e *Editor) Init(app *gfx.App) {
 	e.app.Ui.Add(int(e.app.Width)-150, 0, 150, int(e.app.Height), e.shapeSelectorContents)
 }
 
-func (e *Editor) GetResolution() (int, int) {
-	return 1024, 768
-}
-
-func (e *Editor) isDown1(key1 glfw.Key) bool {
-	return e.app.IsFirstDown(key1) || e.app.IsDownMod(key1, glfw.ModShift)
-}
-
-func (e *Editor) isDown(key1, key2 glfw.Key) bool {
-	return e.isDown1(key1) || e.isDown1(key2)
+func (e *Editor) Name() string {
+	return "editor"
 }
 
 func (e *Editor) Events() {
-	if e.isDown1(glfw.KeyLeftBracket) && e.shapeSelectorIndex > 0 {
+	if e.app.IsDownAlt1(glfw.KeyLeftBracket) && e.shapeSelectorIndex > 0 {
 		e.shapeSelectorIndex--
 		e.shapeSelectorUpdate = true
 	}
-	if e.isDown1(glfw.KeyRightBracket) && e.shapeSelectorIndex < len(shapes.Shapes)-1 {
+	if e.app.IsDownAlt1(glfw.KeyRightBracket) && e.shapeSelectorIndex < len(shapes.Shapes)-1 {
 		e.shapeSelectorIndex++
 		e.shapeSelectorUpdate = true
 	}
-	if e.isDown(glfw.KeyA, glfw.KeyLeft) && e.app.Loader.X > 0 {
-		e.app.Loader.X++
-		e.reload = true
+
+	ox := e.app.Loader.X
+	oy := e.app.Loader.Y
+	if e.app.IsDownAlt(glfw.KeyA, glfw.KeyLeft) && e.app.Loader.X > 0 {
+		ox++
 	}
-	if e.isDown(glfw.KeyD, glfw.KeyRight) {
-		e.app.Loader.X--
-		e.reload = true
+	if e.app.IsDownAlt(glfw.KeyD, glfw.KeyRight) {
+		ox--
 	}
-	if e.isDown(glfw.KeyW, glfw.KeyUp) && e.app.Loader.Y > 0 {
-		e.app.Loader.Y--
-		e.reload = true
+	if e.app.IsDownAlt(glfw.KeyW, glfw.KeyUp) && e.app.Loader.Y > 0 {
+		oy--
 	}
-	if e.isDown(glfw.KeyS, glfw.KeyDown) {
-		e.app.Loader.Y++
-		e.reload = true
+	if e.app.IsDownAlt(glfw.KeyS, glfw.KeyDown) {
+		oy++
 	}
+	e.app.Loader.MoveTo(ox, oy)
 	if e.app.IsFirstDown(glfw.KeySpace) {
 		e.app.Loader.SetShape(e.app.Loader.X, e.app.Loader.Y, e.Z, byte(e.shapeSelectorIndex))
-		e.reload = true
 	}
 	if e.app.IsFirstDown(glfw.KeyE) && e.Z > 0 {
 		shapes.Shapes[e.shapeSelectorIndex].Traverse(func(xx, yy, zz int) {
@@ -80,16 +69,15 @@ func (e *Editor) Events() {
 				e.app.Loader.EraseShape(e.app.Loader.X+xx, e.app.Loader.Y+yy, e.Z-1)
 			}
 		})
-		e.reload = true
 	}
 	if e.app.IsFirstDown(glfw.KeyX) {
 		e.app.Loader.SaveAll()
 	}
 
-	if e.shapeSelectorUpdate || e.reload {
+	if e.shapeSelectorUpdate || e.app.Reload {
 		e.Z = e.findTop()
 		e.app.View.SetCursor(e.shapeSelectorIndex, e.Z)
-		e.reload = true
+		e.app.Invalidate()
 	}
 }
 
@@ -132,13 +120,4 @@ func (e *Editor) shapeSelectorContents(panel *gfx.Panel) bool {
 		return true
 	}
 	return false
-}
-
-func (e *Editor) Draw() {
-	if e.reload {
-		e.app.View.Load(e.app.Loader)
-		e.reload = false
-	}
-	e.app.View.Draw()
-	e.app.Ui.Draw()
 }

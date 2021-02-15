@@ -7,12 +7,15 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
+	"os"
 	"runtime"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
 	"github.com/uzudil/isongn/editor"
 	"github.com/uzudil/isongn/gfx"
+	"github.com/uzudil/isongn/runner"
 )
 
 func init() {
@@ -22,6 +25,7 @@ func init() {
 
 func main() {
 	gameDir := flag.String("game", ".", "Location of the game assets directory")
+	mode := flag.String("mode", "runner", "Game or Editor mode")
 	winWidth := flag.Int("width", 800, "Window width (default: 800)")
 	winHeight := flag.Int("height", 600, "Window height (default: 600)")
 	fps := flag.Float64("fps", 60, "Frames per second")
@@ -33,6 +37,16 @@ func main() {
 	defer glfw.Terminate()
 
 	editor := editor.NewEditor()
-	app := gfx.NewApp(editor, *gameDir, *winWidth, *winHeight, *fps)
+	runner := runner.NewRunner()
+	var game gfx.Game
+	if *mode == editor.Name() {
+		game = editor
+	} else if *mode == runner.Name() {
+		game = runner
+	} else {
+		fmt.Println("mode must be 'runner' or 'editor'")
+		os.Exit(1)
+	}
+	app := gfx.NewApp(game, *gameDir, *winWidth, *winHeight, *fps)
 	app.Run()
 }

@@ -18,9 +18,8 @@ import (
 
 type Game interface {
 	Init(app *App)
-	GetResolution() (int, int)
+	Name() string
 	Events()
-	Draw()
 }
 
 type KeyPress struct {
@@ -39,6 +38,10 @@ type AppConfig struct {
 	ViewSize   int
 	ViewSizeZ  int
 	SectorSize int
+	runtime    map[string]interface{}
+	zoom       float64
+	camera     [3]float32
+	shear      [3]float32
 }
 
 type App struct {
@@ -58,11 +61,12 @@ type App struct {
 	windowWidthDpi, windowHeightDpi int
 	dpiX, dpiY                      float32
 	frameBuffer                     *FrameBuffer
+	Reload                          bool
 }
 
 func NewApp(game Game, gameDir string, windowWidth, windowHeight int, targetFps float64) *App {
-	width, height := game.GetResolution()
 	appConfig := parseConfig(gameDir)
+	width, height := getResolution(appConfig, game.Name())
 	app := &App{
 		Game:         game,
 		Config:       appConfig,
@@ -72,6 +76,7 @@ func NewApp(game Game, gameDir string, windowWidth, windowHeight int, targetFps 
 		Height:       height,
 		windowWidth:  windowWidth,
 		windowHeight: windowHeight,
+		Reload:       true,
 	}
 	app.Dir = initUserdir(appConfig.Name)
 	app.Window = initWindow(windowWidth, windowHeight)
@@ -84,14 +89,18 @@ func NewApp(game Game, gameDir string, windowWidth, windowHeight int, targetFps 
 	app.Window.SetKeyCallback(app.Keypressed)
 	app.Window.SetScrollCallback(app.MouseScroll)
 	app.frameBuffer = NewFrameBuffer(int32(width), int32(height))
-	err := shapes.InitShapes()
+	err := shapes.InitShapes(gameDir)
 	if err != nil {
 		panic(err)
 	}
-	app.View = InitView()
+	app.View = InitView(appConfig.zoom, appConfig.camera, appConfig.shear)
 	app.Ui = InitUi(width, height)
-	app.Loader = world.NewLoader(app.Dir, 1000, 1000)
+	app.Loader = world.NewLoader(app.Dir, 1000, 1000, app)
 	return app
+}
+
+func (app *App) Invalidate() {
+	app.Reload = true
 }
 
 func parseConfig(gameDir string) *AppConfig {
@@ -106,6 +115,8 @@ func parseConfig(gameDir string) *AppConfig {
 	}
 
 	view := data["view"].(map[string]interface{})
+	camera := view["camera"].([]interface{})
+	shear := view["shear"].([]interface{})
 	config := &AppConfig{
 		GameDir:    gameDir,
 		Title:      data["title"].(string),
@@ -114,9 +125,26 @@ func parseConfig(gameDir string) *AppConfig {
 		ViewSize:   int(view["size"].(float64)),
 		ViewSizeZ:  int(view["sizeZ"].(float64)),
 		SectorSize: int(view["sector"].(float64)),
+		runtime:    data["runtime"].(map[string]interface{}),
+		zoom:       view["zoom"].(float64),
+		camera:     [3]float32{float32(camera[0].(float64)), float32(camera[1].(float64)), float32(camera[2].(float64))},
+		shear:      [3]float32{float32(shear[0].(float64)), float32(shear[1].(float64)), float32(shear[2].(float64))},
 	}
 	fmt.Printf("Starting game: %s (v%f)\n", config.Title, config.Version)
 	return config
+}
+
+func getResolution(appConfig *AppConfig, mode string) (int, int) {
+	runtimeConfig, ok := appConfig.runtime[mode]
+	if ok == false {
+		panic("Can't find runtime config")
+	}
+	resolution, ok := (runtimeConfig.(map[string]interface{}))["resolution"]
+	if ok == false {
+		panic("Can't find resolution in runtime config")
+	}
+	resArray := (resolution.([]interface{}))
+	return int(resArray[0].(float64)), int(resArray[1].(float64))
 }
 
 func initUserdir(gameName string) string {
@@ -198,6 +226,14 @@ func (app *App) Keypressed(w *glfw.Window, key glfw.Key, scancode int, action gl
 	}
 }
 
+func (app *App) IsDownAlt1(key1 glfw.Key) bool {
+	return app.IsFirstDown(key1) || app.IsDownMod(key1, glfw.ModShift)
+}
+
+func (app *App) IsDownAlt(key1, key2 glfw.Key) bool {
+	return app.IsDownAlt1(key1) || app.IsDownAlt1(key2)
+}
+
 func (app *App) MouseScroll(w *glfw.Window, xoffs, yoffs float64) {
 	app.View.Zoom(yoffs)
 }
@@ -224,7 +260,6 @@ func (app *App) Sleep(lastTime float64) float64 {
 }
 
 func (app *App) Run() {
-
 	app.Game.Init(app)
 
 	// Configure global settings
@@ -243,9 +278,16 @@ func (app *App) Run() {
 		// set to render to frame buffer
 		app.frameBuffer.Enable(app.Width, app.Height)
 
-		// render game
+		// handle events
 		app.Game.Events()
-		app.Game.Draw()
+
+		// redraw
+		if app.Reload {
+			app.View.Load(app.Loader)
+			app.Reload = false
+		}
+		app.View.Draw()
+		app.Ui.Draw()
 
 		// render framebuffer to screen
 		app.frameBuffer.Draw(app.windowWidthDpi, app.windowHeightDpi)

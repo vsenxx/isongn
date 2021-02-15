@@ -2,9 +2,20 @@
     "title": "Escape from Enilar",
     "name": "enilar",
     "version": 0.1,
+    "runtime": {
+        "editor": {
+            "resolution": [ 1024, 768 ]
+        },
+        "runner": {
+            "resolution": [ 320, 240 ]
+        }        
+    },
     "view": {
         "size": 64,
         "sizeZ": 32,
-        "sector": 400
+        "sector": 400,
+        "camera": [ 0.000001, 0.000001, 1 ],
+        "zoom": 1.5,
+        "shear": [ 0, -2, 0 ]
     }
 }

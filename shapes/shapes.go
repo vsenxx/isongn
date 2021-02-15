@@ -18,7 +18,6 @@ import (
 type ShapeMeta struct {
 	DpiMultiplier float32
 	UnitPixels    [2]int
-	Angles        [2]float32
 }
 
 type Shape struct {
@@ -39,8 +38,8 @@ var Shapes []*Shape
 var Names map[string]int = map[string]int{}
 var Images []image.Image
 
-func InitShapes() error {
-	bytes, err := ioutil.ReadFile(filepath.Join("images", "shapes.json"))
+func InitShapes(gameDir string) error {
+	bytes, err := ioutil.ReadFile(filepath.Join(gameDir, "shapes.json"))
 	if err != nil {
 		// return nil not error: file missing is not an error
 		return err
@@ -59,15 +58,13 @@ func InitShapes() error {
 		// per-image meta data
 		grid := block["grid"].(map[string]interface{})
 		units := grid["units"].([]interface{})
-		angles := grid["angles"].([]interface{})
 		dpi := block["dpi"].(float64)
 		shapeMeta := &ShapeMeta{
 			DpiMultiplier: float32(dpi) / 96.0,
 			UnitPixels:    [2]int{int(units[0].(float64)), int(units[1].(float64))},
-			Angles:        [2]float32{float32(angles[0].(float64)), float32(angles[1].(float64))},
 		}
 
-		img, err := loadImage(imgFile)
+		img, err := loadImage(filepath.Join(gameDir, "images", imgFile))
 		if err != nil {
 			return err
 		}
@@ -93,7 +90,7 @@ func initShape(name string, shapeDef map[string]interface{}, imageIndex int, img
 	unitPixelX := float32(shapeMeta.UnitPixels[0])
 	unitPixelY := float32(shapeMeta.UnitPixels[1])
 	pw := (size[0] + size[1]) * unitPixelX * shapeMeta.DpiMultiplier
-	ph := (size[0]*unitPixelY/2 + size[1]*unitPixelY/2 + size[2]*unitPixelY) * shapeMeta.DpiMultiplier
+	ph := (size[0] + size[1] + size[2]) * unitPixelY * shapeMeta.DpiMultiplier
 	fudge64, ok := shapeDef["fudge"].(float64)
 	var fudge float32 = 0.01
 	if ok {
@@ -125,7 +122,7 @@ func initShape(name string, shapeDef map[string]interface{}, imageIndex int, img
 }
 
 func loadImage(path string) (image.Image, error) {
-	imgFile, err := os.Open(filepath.Join("images", path))
+	imgFile, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}

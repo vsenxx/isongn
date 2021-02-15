@@ -47,22 +47,24 @@ type View struct {
 	vao                uint32
 	blockPos           [SIZE][SIZE][world.SECTION_Z_SIZE]*BlockPos
 	zoom               float64
+	shear              [3]float32
 	Cursor             *BlockPos
 }
 
 const viewSize = 10
 const SIZE = 64
 
-func getProjection(zoom float32) mgl32.Mat4 {
+func getProjection(zoom float32, shear [3]float32) mgl32.Mat4 {
 	projection := mgl32.Ortho(-viewSize*zoom*0.95, viewSize*zoom*0.95, -viewSize*zoom*0.95, viewSize*zoom*0.95, -viewSize*zoom*2, viewSize*zoom*2)
-	shear := mgl32.Ident4()
-	shear.Set(0, 2, 0)
-	shear.Set(1, 2, -2)
-	projection = shear.Mul4(projection)
+	m := mgl32.Ident4()
+	m.Set(0, 2, shear[0])
+	m.Set(1, 2, shear[1])
+	m.Set(2, 1, shear[2])
+	projection = m.Mul4(projection)
 	return projection
 }
 
-func InitView() *View {
+func InitView(zoom float64, camera, shear [3]float32) *View {
 	// does this have to be called in every file?
 	var err error
 	if err = gl.Init(); err != nil {
@@ -70,12 +72,13 @@ func InitView() *View {
 	}
 
 	view := &View{
-		zoom: 1,
+		zoom:  zoom,
+		shear: shear,
 	}
-	view.projection = getProjection(1)
+	view.projection = getProjection(float32(view.zoom), view.shear)
 
 	// coordinate system: Z is up
-	view.camera = mgl32.LookAtV(mgl32.Vec3{0.001, 0.001, 1}, mgl32.Vec3{0, 0, 0}, mgl32.Vec3{0, 0, 1})
+	view.camera = mgl32.LookAtV(mgl32.Vec3{camera[0], camera[1], camera[2]}, mgl32.Vec3{0, 0, 0}, mgl32.Vec3{0, 0, 1})
 
 	// Configure the vertex and fragment shaders
 	view.program, err = NewProgram(vertexShader, fragmentShader)
@@ -211,7 +214,7 @@ func (b *Block) vertices() []float32 {
 	//      x     y
 	w := b.sizeX
 	h := b.sizeY
-	d := b.sizeZ * 2
+	d := b.sizeZ
 
 	// total width/height of texture
 	tx := h + w
@@ -221,13 +224,13 @@ func (b *Block) vertices() []float32 {
 	var f float32 = b.shape.Fudge
 
 	points := []float32{
-		w, 0, d, f, w / ty,
+		w, 0, d, f, (w - f) / ty,
 		w, 0, 0, f, (w + d) / ty,
-		w, h, 0, (h) / tx, 1 - f,
+		w, h, 0, h / tx, 1,
 		0, h, 0, 1 - f, (h + d) / ty,
-		0, h, d, 1 - f, h / ty,
-		0, 0, d, (w) / tx, f,
-		w, h, d, (h) / tx, (h + w) / ty,
+		0, h, d, 1 - f, (h - f) / ty,
+		0, 0, d, w / tx, f,
+		w, h, d, h / tx, (w + h - 6*f) / ty,
 	}
 
 	// scale and translate tex coords to within larger texture
@@ -322,7 +325,7 @@ func (b *BlockPos) Draw(view *View) {
 func (view *View) Zoom(zoom float64) {
 	view.zoom = math.Min(math.Max(view.zoom-zoom*0.1, 0.35), 16)
 	// fmt.Printf("zoom:%f\n", view.zoom)
-	view.projection = getProjection(float32(view.zoom))
+	view.projection = getProjection(float32(view.zoom), view.shear)
 	gl.UseProgram(view.program)
 	gl.UniformMatrix4fv(view.projectionUniform, 1, false, &view.projection[0])
 }

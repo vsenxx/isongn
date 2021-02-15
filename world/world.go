@@ -35,14 +35,27 @@ func NewSectionCache() *SectionCache {
 	return &SectionCache{}
 }
 
+type Display interface {
+	Invalidate()
+}
+
 type Loader struct {
 	dir          string
 	X, Y         int
 	sectionCache *SectionCache
+	display      Display
 }
 
-func NewLoader(dir string, x, y int) *Loader {
-	return &Loader{dir, x, y, NewSectionCache()}
+func NewLoader(dir string, x, y int, display Display) *Loader {
+	return &Loader{dir, x, y, NewSectionCache(), display}
+}
+
+func (loader *Loader) MoveTo(x, y int) {
+	if loader.X != x || loader.Y != y {
+		loader.X = x
+		loader.Y = y
+		loader.display.Invalidate()
+	}
 }
 
 func (loader *Loader) SetShape(x, y, z int, shapeIndex byte) bool {
@@ -53,6 +66,7 @@ func (loader *Loader) SetShape(x, y, z int, shapeIndex byte) bool {
 		sec, ax, ay, az := loader.getPosInSection(x+xx, y+yy, z+zz)
 		sec.origins[ax][ay][az] = &Point{x, y, z}
 	})
+	loader.display.Invalidate()
 	return true
 }
 
@@ -68,6 +82,7 @@ func (loader *Loader) EraseShape(x, y, z int) bool {
 				sec.origins[ax][ay][az] = nil
 			})
 			section.shapes[atomX][atomY][atomZ] = 0
+			loader.display.Invalidate()
 			return true
 		}
 	}
