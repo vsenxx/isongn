@@ -14,10 +14,7 @@ isongn is written in Go with minimal dependencies so it should run on all platfo
 
 ## How to use isongn
 
-This section will be expanded with more information as it becomes available.
-- Create an `images` directory consisting of your tiles (see examples in this repo). 
-   - I'd recommend working with an isometric grid of about 26.57 degree angles which would make your triangles about x=1,y=2 size - easy to measure.
-   - Also create the `images/shapes.json` file (see [example](images/shapes.json)), describing your tileset(s).
+Please see the [User Guide](https://github.com/uzudil/isongn/wiki/Isongn-User-Guide) about how to use isongn to make your own games.
 
 ## Plans!
 
