@@ -1,18 +1,22 @@
 package world
 
 import (
+	"compress/gzip"
+	"encoding/gob"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"time"
+	"unsafe"
 
 	"github.com/uzudil/isongn/shapes"
 )
 
 const (
-	SECTION_SIZE   = 400
-	SECTION_Z_SIZE = 32
+	SECTION_SIZE   = 200
+	SECTION_Z_SIZE = 24
+	STAMP_SIZE     = 8
 	VERSION        = 1
 )
 
@@ -20,10 +24,15 @@ type Point struct {
 	x, y, z int
 }
 
+type Position struct {
+	Shape byte
+	Stamp [STAMP_SIZE]byte
+}
+
 type Section struct {
-	X, Y    int
-	shapes  [SECTION_SIZE][SECTION_SIZE][SECTION_Z_SIZE]byte
-	origins [SECTION_SIZE][SECTION_SIZE][SECTION_Z_SIZE]*Point
+	X, Y     int
+	position [SECTION_SIZE][SECTION_SIZE][SECTION_Z_SIZE]Position
+	origins  [SECTION_SIZE][SECTION_SIZE][SECTION_Z_SIZE]*Point
 }
 
 type SectionCache struct {
@@ -60,7 +69,7 @@ func (loader *Loader) MoveTo(x, y int) {
 
 func (loader *Loader) SetShape(x, y, z int, shapeIndex byte) bool {
 	section, atomX, atomY, atomZ := loader.getPosInSection(x, y, z)
-	section.shapes[atomX][atomY][atomZ] = shapeIndex + 1
+	section.position[atomX][atomY][atomZ].Shape = shapeIndex + 1
 	// mark the shape's origin
 	shapes.Shapes[shapeIndex].Traverse(func(xx, yy, zz int) {
 		sec, ax, ay, az := loader.getPosInSection(x+xx, y+yy, z+zz)
@@ -75,13 +84,13 @@ func (loader *Loader) EraseShape(x, y, z int) bool {
 	if section.origins[atomX][atomY][atomZ] != nil {
 		o := section.origins[atomX][atomY][atomZ]
 		section, atomX, atomY, atomZ := loader.getPosInSection(o.x, o.y, o.z)
-		shapeIndex := section.shapes[atomX][atomY][atomZ]
+		shapeIndex := section.position[atomX][atomY][atomZ].Shape
 		if shapeIndex > 0 {
 			shapes.Shapes[shapeIndex-1].Traverse(func(xx, yy, zz int) {
 				sec, ax, ay, az := loader.getPosInSection(x+xx, y+yy, z+zz)
 				sec.origins[ax][ay][az] = nil
 			})
-			section.shapes[atomX][atomY][atomZ] = 0
+			section.position[atomX][atomY][atomZ].Shape = 0
 			loader.display.Invalidate()
 			return true
 		}
@@ -94,7 +103,7 @@ func (loader *Loader) GetShape(worldX, worldY, worldZ int) (byte, int, int, int,
 	if section.origins[atomX][atomY][atomZ] != nil {
 		o := section.origins[atomX][atomY][atomZ]
 		section, atomX, atomY, atomZ := loader.getPosInSection(o.x, o.y, o.z)
-		shapeIndex := section.shapes[atomX][atomY][atomZ]
+		shapeIndex := section.position[atomX][atomY][atomZ].Shape
 		if shapeIndex == 0 {
 			return 0, 0, 0, 0, false
 		}
@@ -153,8 +162,8 @@ func (loader *Loader) getSection(sx, sy int) (*Section, error) {
 	for x := 0; x < SECTION_SIZE; x++ {
 		for y := 0; y < SECTION_SIZE; y++ {
 			for z := 0; z < SECTION_Z_SIZE; z++ {
-				if section.shapes[x][y][z] > 0 {
-					shapes.Shapes[section.shapes[x][y][z]-1].Traverse(func(xx, yy, zz int) {
+				if section.position[x][y][z].Shape > 0 {
+					shapes.Shapes[section.position[x][y][z].Shape-1].Traverse(func(xx, yy, zz int) {
 						sec, ax, ay, az := loader.getPosInSection(startX+x+xx, startY+y+yy, z+zz)
 						if sec == section {
 							sec.origins[ax][ay][az] = &Point{startX + x, startY + y, z}
@@ -188,7 +197,8 @@ func (loader *Loader) load(sx, sy int) (*Section, error) {
 	path := loader.getPath(sx, sy)
 	fmt.Printf("Looking for section: %s\n", path)
 	if _, err := os.Stat(path); err == nil {
-		fmt.Printf("Loading section: %s\n", path)
+		defer un(trace("Loading map"))
+		fmt.Printf("Loading section: %s bytes: %d\n", path, unsafe.Sizeof(section.position))
 
 		f, err := os.Open(path)
 		defer f.Close()
@@ -196,27 +206,31 @@ func (loader *Loader) load(sx, sy int) (*Section, error) {
 			return nil, err
 		}
 
+		fz, err := gzip.NewReader(f)
+		if err != nil {
+			return nil, err
+		}
+		defer fz.Close()
+
 		version := make([]byte, 1)
-		_, err = f.Read(version)
+		_, err = fz.Read(version)
 		if err != nil {
 			return nil, err
 		}
 		fmt.Printf("\tversion=%d\n", version[0])
 
 		// if version > VERSION... do something
-		for x := 0; x < SECTION_SIZE; x++ {
-			for y := 0; y < SECTION_SIZE; y++ {
-				_, err := f.Read(section.shapes[x][y][:])
-				if err != nil {
-					return nil, err
-				}
-			}
+		dec := gob.NewDecoder(fz)
+		err = dec.Decode(&section.position)
+		if err != nil {
+			return nil, err
 		}
 	}
 	return section, nil
 }
 
 func (loader *Loader) save(section *Section) error {
+	defer un(trace("Saving map"))
 	path := loader.getPath(section.X, section.Y)
 	fmt.Printf("Writing section: %s\n", path)
 	f, err := os.Create(path)
@@ -225,12 +239,15 @@ func (loader *Loader) save(section *Section) error {
 	}
 	defer f.Close()
 
+	fz := gzip.NewWriter(f)
+	defer fz.Close()
+
 	b := []byte{VERSION}
-	f.Write(b)
-	for x := 0; x < SECTION_SIZE; x++ {
-		for y := 0; y < SECTION_SIZE; y++ {
-			f.Write(section.shapes[x][y][:])
-		}
+	fz.Write(b)
+	enc := gob.NewEncoder(fz)
+	err = enc.Encode(section.position)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -238,4 +255,14 @@ func (loader *Loader) save(section *Section) error {
 
 func (loader *Loader) getPath(sx, sy int) string {
 	return filepath.Join(loader.dir, fmt.Sprintf("map%02x%02x", sx, sy))
+}
+
+func trace(s string) (string, time.Time) {
+	log.Println("START:", s)
+	return s, time.Now()
+}
+
+func un(s string, startTime time.Time) {
+	endTime := time.Now()
+	log.Println("  END:", s, "ElapsedTime in seconds:", endTime.Sub(startTime))
 }
