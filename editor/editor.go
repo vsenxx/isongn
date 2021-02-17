@@ -1,9 +1,11 @@
 package editor
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
+	"strings"
 
 	"github.com/uzudil/isongn/world"
 
@@ -35,6 +37,30 @@ func (e *Editor) Name() string {
 	return "editor"
 }
 
+var moveKeys map[glfw.Key][2]int = map[glfw.Key][2]int{
+	glfw.KeyA:     {1, 0},
+	glfw.KeyLeft:  {1, 0},
+	glfw.KeyD:     {-1, 0},
+	glfw.KeyRight: {-1, 0},
+	glfw.KeyW:     {0, -1},
+	glfw.KeyUp:    {0, -1},
+	glfw.KeyS:     {0, 1},
+	glfw.KeyDown:  {0, 1},
+}
+
+func (e *Editor) isMoveKey() (int, int, bool) {
+	for key, delta := range moveKeys {
+		f := e.app.IsFirstDown(key)
+		if f && e.app.IsDownMod(key, glfw.ModAlt) {
+			return delta[0], delta[1], true
+		}
+		if f || e.app.IsDownMod(key, glfw.ModShift) {
+			return delta[0], delta[1], false
+		}
+	}
+	return 0, 0, false
+}
+
 func (e *Editor) Events() {
 	if e.app.IsDownAlt1(glfw.KeyLeftBracket) && e.shapeSelectorIndex > 0 {
 		e.shapeSelectorIndex--
@@ -45,23 +71,17 @@ func (e *Editor) Events() {
 		e.shapeSelectorUpdate = true
 	}
 
-	ox := e.app.Loader.X
-	oy := e.app.Loader.Y
-	if e.app.IsDownAlt(glfw.KeyA, glfw.KeyLeft) && e.app.Loader.X > 0 {
-		ox++
+	shape := shapes.Shapes[e.shapeSelectorIndex]
+	dx, dy, insertMode := e.isMoveKey()
+	if insertMode {
+		dx *= int(shape.Size[0])
+		dy *= int(shape.Size[1])
 	}
-	if e.app.IsDownAlt(glfw.KeyD, glfw.KeyRight) {
-		ox--
-	}
-	if e.app.IsDownAlt(glfw.KeyW, glfw.KeyUp) && e.app.Loader.Y > 0 {
-		oy--
-	}
-	if e.app.IsDownAlt(glfw.KeyS, glfw.KeyDown) {
-		oy++
-	}
-	e.app.Loader.MoveTo(ox, oy)
-	if e.app.IsFirstDown(glfw.KeySpace) {
-		e.app.Loader.SetShape(e.app.Loader.X, e.app.Loader.Y, e.Z, byte(e.shapeSelectorIndex))
+	e.app.Loader.MoveTo(e.app.Loader.X+dx, e.app.Loader.Y+dy)
+
+	if insertMode || e.app.IsFirstDown(glfw.KeySpace) {
+		e.Z = e.findTop()
+		e.setShape()
 	}
 	if e.app.IsFirstDown(glfw.KeyE) && e.Z > 0 {
 		shapes.Shapes[e.shapeSelectorIndex].Traverse(func(xx, yy, zz int) {
@@ -78,6 +98,50 @@ func (e *Editor) Events() {
 		e.Z = e.findTop()
 		e.app.View.SetCursor(e.shapeSelectorIndex, e.Z)
 		e.app.Invalidate()
+	}
+}
+
+var edgeDefs [4][2]int = [4][2]int{{0, 1}, {1, 0}, {-1, 0}, {0, -1}}
+
+func (e *Editor) setShape() {
+	x := e.app.Loader.X
+	y := e.app.Loader.Y
+	z := e.Z
+	shape := shapes.Shapes[e.shapeSelectorIndex]
+	if strings.HasPrefix(shape.Name, "ground.") {
+		x = (x / 4) * 4
+		y = (y / 4) * 4
+		z = 0
+	}
+	e.app.Loader.SetShape(x, y, z, byte(e.shapeSelectorIndex))
+
+	for xx := -1; xx <= 1; xx++ {
+		for yy := -1; yy <= 1; yy++ {
+			sx := x + xx*int(shape.Size[0])
+			sy := y + yy*int(shape.Size[1])
+			shapeIndex, _, _, _, found := e.app.Loader.GetShape(sx, sy, z)
+			if found {
+				e.setEdges(sx, sy, z, shapes.Shapes[shapeIndex])
+			}
+		}
+	}
+}
+
+func (e *Editor) setEdges(x, y, z int, shape *shapes.Shape) {
+	for edgeIndex, edgeDef := range edgeDefs {
+		ex := x + edgeDef[0]*int(shape.Size[0])
+		ey := y + edgeDef[1]*int(shape.Size[1])
+		shapeIndex, _, _, _, found := e.app.Loader.GetShape(ex, ey, z)
+		if found && int(shapeIndex) == shape.Index {
+			fmt.Printf("clearing: %s %d\n", shape.Name, edgeIndex)
+			e.app.Loader.ClearEdge(ex, ey, z, edgeIndex)
+		} else if shape.HasEdges {
+			toShapeName := ""
+			if found {
+				toShapeName = shapes.Shapes[shapeIndex].Name
+			}
+			e.app.Loader.SetEdge(ex, ey, z, edgeIndex, shape.EdgeShapeIndex(toShapeName, edgeIndex))
+		}
 	}
 }
 

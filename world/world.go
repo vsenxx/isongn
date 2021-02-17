@@ -27,6 +27,7 @@ type Point struct {
 type Position struct {
 	Shape byte
 	Stamp [STAMP_SIZE]byte
+	Edges [4]byte
 }
 
 type Section struct {
@@ -60,11 +61,32 @@ func NewLoader(dir string, x, y int, display Display) *Loader {
 }
 
 func (loader *Loader) MoveTo(x, y int) {
-	if loader.X != x || loader.Y != y {
+	if x >= 0 && y >= 0 && (loader.X != x || loader.Y != y) {
 		loader.X = x
 		loader.Y = y
 		loader.display.Invalidate()
 	}
+}
+
+func (loader *Loader) ClearEdge(x, y, z, edgeIndex int) {
+	section, atomX, atomY, atomZ := loader.getPosInSection(x, y, z)
+	section.position[atomX][atomY][atomZ].Edges[edgeIndex] = 0
+	loader.display.Invalidate()
+}
+
+func (loader *Loader) SetEdge(x, y, z, edgeIndex int, shapeIndex byte) {
+	section, atomX, atomY, atomZ := loader.getPosInSection(x, y, z)
+	section.position[atomX][atomY][atomZ].Edges[edgeIndex] = shapeIndex + 1
+	loader.display.Invalidate()
+}
+
+func (loader *Loader) GetEdge(x, y, z, edgeIndex int) (byte, bool) {
+	section, atomX, atomY, atomZ := loader.getPosInSection(x, y, z)
+	shapeIndex := section.position[atomX][atomY][atomZ].Edges[edgeIndex]
+	if shapeIndex == 0 {
+		return 0, false
+	}
+	return shapeIndex - 1, true
 }
 
 func (loader *Loader) SetShape(x, y, z int, shapeIndex byte) bool {

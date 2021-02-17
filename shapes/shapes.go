@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"path/filepath"
 
@@ -15,25 +16,31 @@ import (
 	_ "image/png"
 )
 
+type Edge struct {
+	Shapes []*Shape
+}
+
 type ShapeMeta struct {
 	DpiMultiplier float32
 	UnitPixels    [2]int
 }
 
 type Shape struct {
-	Index       int
-	Name        string
-	Image       *image.RGBA
-	Size        [3]float32
-	PixelOffset [2]float32
-	PixelDim    [2]float32
-	TexOffset   [2]float32
-	TexDim      [2]float32
-	Fudge       float32
-	ImageIndex  int
-	ShapeMeta   *ShapeMeta
-	Flags       map[string]bool
-	EdgeOf      *Shape
+	Index            int
+	Name             string
+	Image            *image.RGBA
+	Size             [3]float32
+	PixelOffset      [2]float32
+	PixelDim         [2]float32
+	TexOffset        [2]float32
+	TexDim           [2]float32
+	Fudge            float32
+	ImageIndex       int
+	ShapeMeta        *ShapeMeta
+	Flags            map[string]bool
+	EdgeFrom, EdgeTo *Shape
+	HasEdges         bool
+	Edges            map[string][4]*Edge
 }
 
 var Shapes []*Shape
@@ -123,20 +130,10 @@ func appendShape(name string, shapeDef map[string]interface{}, imageIndex int, i
 	}
 
 	// edge of...
-	var edgeOf *Shape
-	if edgeOfName, ok := shapeDef["edgeOf"].(string); ok {
-		for _, s := range Shapes {
-			if s.Name == edgeOfName {
-				edgeOf = s
-				break
-			}
-		}
-		if edgeOf == nil {
-			panic("Can't find edgeOf shape: " + edgeOfName)
-		}
-	}
+	var edgeFrom *Shape = findShape("edgeFrom", shapeDef)
+	var edgeTo *Shape = findShape("edgeTo", shapeDef)
 
-	if edgeOf != nil {
+	if edgeFrom != nil {
 		for xx := 0; xx < 2; xx++ {
 			for yy := 0; yy < 2; yy++ {
 
@@ -152,7 +149,7 @@ func appendShape(name string, shapeDef map[string]interface{}, imageIndex int, i
 				cornerImageIndex := len(Images)
 				Images = append(Images, cornerImg)
 
-				Shapes = append(Shapes, newShape(
+				shape := newShape(
 					len(Shapes),
 					name+"."+cornerSuffix[xx][yy],
 					size,
@@ -162,8 +159,27 @@ func appendShape(name string, shapeDef map[string]interface{}, imageIndex int, i
 					cornerImageIndex,
 					shapeMeta,
 					flagsSet,
-					edgeOf,
-				))
+				)
+
+				// link the edges to their shape (and back)
+				shape.EdgeFrom = edgeFrom
+				shape.EdgeTo = edgeTo
+				edgeIndex := yy*2 + xx
+				edgeFrom.HasEdges = true
+				edgeKey := ""
+				if edgeTo != nil {
+					edgeKey = edgeTo.Name
+				}
+				_, ok := edgeFrom.Edges[edgeKey]
+				if ok == false {
+					edgeFrom.Edges[edgeKey] = [4]*Edge{
+						{[]*Shape{}}, {[]*Shape{}}, {[]*Shape{}}, {[]*Shape{}},
+					}
+				}
+				edgeFrom.Edges[edgeKey][edgeIndex].Shapes = append(edgeFrom.Edges[edgeKey][edgeIndex].Shapes, shape)
+
+				Shapes = append(Shapes, shape)
+
 			}
 		}
 	} else {
@@ -177,12 +193,23 @@ func appendShape(name string, shapeDef map[string]interface{}, imageIndex int, i
 			imageIndex,
 			shapeMeta,
 			flagsSet,
-			edgeOf,
 		))
 	}
 }
 
-func newShape(index int, name string, size [3]float32, px, py, pw, ph float32, img image.Image, fudge float32, imageIndex int, shapeMeta *ShapeMeta, flagsSet map[string]bool, edgeOf *Shape) *Shape {
+func findShape(attr string, shapeDef map[string]interface{}) *Shape {
+	if name, ok := shapeDef[attr].(string); ok {
+		for _, s := range Shapes {
+			if s.Name == name {
+				return s
+			}
+		}
+		panic("Can't find shape for attribute " + attr + ": " + name)
+	}
+	return nil
+}
+
+func newShape(index int, name string, size [3]float32, px, py, pw, ph float32, img image.Image, fudge float32, imageIndex int, shapeMeta *ShapeMeta, flagsSet map[string]bool) *Shape {
 	imageBounds := img.Bounds()
 	shape := &Shape{
 		Index:       len(Shapes),
@@ -196,7 +223,7 @@ func newShape(index int, name string, size [3]float32, px, py, pw, ph float32, i
 		ImageIndex:  imageIndex,
 		ShapeMeta:   shapeMeta,
 		Flags:       flagsSet,
-		EdgeOf:      edgeOf,
+		Edges:       map[string][4]*Edge{},
 	}
 
 	// create a half-size thumbnail
@@ -229,4 +256,16 @@ func (shape *Shape) Traverse(fx func(x, y, z int)) {
 			}
 		}
 	}
+}
+
+func (shape *Shape) EdgeShapeIndex(toShapeName string, edgeIndex int) byte {
+	if shape.HasEdges {
+		a, ok := shape.Edges[toShapeName]
+		if ok == false {
+			a = shape.Edges[""]
+		}
+		s := a[edgeIndex].Shapes
+		return byte(s[rand.Intn(len(s))].Index)
+	}
+	return 0
 }

@@ -43,12 +43,12 @@
             { "name": "ground.stone", "size": [ 4, 4, 1], "pos": [648, 520] },
             { "name": "ground.cobble", "size": [ 4, 4, 1], "pos": [728, 520] },
             { "name": "ground.grass.3", "size": [ 4, 4, 1], "pos": [808, 520] },
-            { "name": "stamp.grass.1", "size": [ 4, 4, 0], "pos": [8, 616], "flags": [ "stamp" ], "edgeOf": "ground.grass" },
-            { "name": "stamp.grass.2", "size": [ 4, 4, 0], "pos": [88, 616], "flags": [ "stamp" ], "edgeOf": "ground.grass" },
+            { "name": "stamp.grass.1", "size": [ 4, 4, 0], "pos": [8, 616], "flags": [ "stamp" ], "edgeFrom": "ground.grass" },
+            { "name": "stamp.grass.2", "size": [ 4, 4, 0], "pos": [88, 616], "flags": [ "stamp" ], "edgeFrom": "ground.grass" },
             { "name": "stamp.dirt", "size": [ 4, 4, 0], "pos": [160, 616], "flags": [ "stamp" ] },
             { "name": "stamp.hay", "size": [ 4, 4, 0], "pos": [224, 616], "flags": [ "stamp" ] },
-            { "name": "stamp.edge", "size": [ 4, 4, 0], "pos": [296, 616], "flags": [ "stamp" ], "edgeOf": "ground.water" },
-            { "name": "stamp.sand", "size": [ 4, 4, 0], "pos": [376, 616], "flags": [ "stamp" ], "edgeOf": "ground.sand" }
+            { "name": "stamp.edge", "size": [ 4, 4, 0], "pos": [296, 616], "flags": [ "stamp" ], "edgeFrom": "ground.grass", "edgeTo": "ground.water" },
+            { "name": "stamp.sand", "size": [ 4, 4, 0], "pos": [376, 616], "flags": [ "stamp" ], "edgeFrom": "ground.sand" }
         ]
     }
 ]

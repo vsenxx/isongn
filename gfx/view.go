@@ -28,9 +28,11 @@ type Block struct {
 
 // BlockPos is a displayed Shape at a location
 type BlockPos struct {
-	model   mgl32.Mat4
-	x, y, z int
-	block   *Block
+	model     mgl32.Mat4
+	x, y, z   int
+	block     *Block
+	edges     [4]*Block
+	edgeModel mgl32.Mat4
 }
 
 type View struct {
@@ -113,16 +115,25 @@ func InitView(zoom float64, camera, shear [3]float32) *View {
 		for y := 0; y < SIZE; y++ {
 			for z := 0; z < world.SECTION_Z_SIZE; z++ {
 				model := mgl32.Ident4()
+
 				// translate to position
 				model.Set(0, 3, float32(x-SIZE/2))
 				model.Set(1, 3, float32(y-SIZE/2))
 				model.Set(2, 3, float32(z))
+				edgeModel := mgl32.Ident4()
+
+				// translate to position
+				edgeModel.Set(0, 3, float32(x-SIZE/2))
+				edgeModel.Set(1, 3, float32(y-SIZE/2))
+				edgeModel.Set(2, 3, float32(z)+1.001)
+
 				view.blockPos[x][y][z] = &BlockPos{
-					x:     x,
-					y:     y,
-					z:     z,
-					model: model,
-					block: nil,
+					x:         x,
+					y:         y,
+					z:         z,
+					model:     model,
+					block:     nil,
+					edgeModel: edgeModel,
 				}
 			}
 		}
@@ -261,6 +272,9 @@ func (view *View) Load(loader *world.Loader) {
 	view.traverse(func(x, y, z int, blockPos *BlockPos) {
 		// reset
 		blockPos.block = nil
+		for edgeIndex := 0; edgeIndex < 4; edgeIndex++ {
+			blockPos.edges[edgeIndex] = nil
+		}
 
 		atomX := loader.X - SIZE/2 + x
 		atomY := loader.Y - SIZE/2 + y
@@ -268,6 +282,14 @@ func (view *View) Load(loader *world.Loader) {
 		shapeIndex, shapeX, shapeY, shapeZ, hasShape := loader.GetShape(atomX, atomY, atomZ)
 		if hasShape && atomX == shapeX && atomY == shapeY && atomZ == shapeZ {
 			blockPos.block = view.blocks[shapeIndex]
+		}
+		if z == 0 {
+			for edgeIndex := 0; edgeIndex < 4; edgeIndex++ {
+				shapeIndex, hasShape = loader.GetEdge(atomX, atomY, atomZ, edgeIndex)
+				if hasShape {
+					blockPos.edges[edgeIndex] = view.blocks[shapeIndex]
+				}
+			}
 		}
 	})
 }
@@ -307,6 +329,11 @@ func (view *View) Draw() {
 		if blockPos.block != nil {
 			blockPos.Draw(view)
 		}
+		for edgeIndex := 0; edgeIndex < 4; edgeIndex++ {
+			if blockPos.edges[edgeIndex] != nil {
+				blockPos.DrawEdge(view, edgeIndex)
+			}
+		}
 	})
 	if view.Cursor.block != nil {
 		view.Cursor.Draw(view)
@@ -319,6 +346,15 @@ func (b *BlockPos) Draw(view *View) {
 	gl.VertexAttribPointer(view.vertAttrib, 3, gl.FLOAT, false, 5*4, gl.PtrOffset(0))
 	gl.VertexAttribPointer(view.texCoordAttrib, 2, gl.FLOAT, false, 5*4, gl.PtrOffset(3*4))
 	gl.UniformMatrix4fv(view.modelUniform, 1, false, &b.model[0])
+	gl.DrawArrays(gl.TRIANGLES, 0, 3*2*3)
+}
+
+func (b *BlockPos) DrawEdge(view *View, edgeIndex int) {
+	gl.BindTexture(gl.TEXTURE_2D, b.edges[edgeIndex].texture.texture)
+	gl.BindBuffer(gl.ARRAY_BUFFER, b.edges[edgeIndex].vbo)
+	gl.VertexAttribPointer(view.vertAttrib, 3, gl.FLOAT, false, 5*4, gl.PtrOffset(0))
+	gl.VertexAttribPointer(view.texCoordAttrib, 2, gl.FLOAT, false, 5*4, gl.PtrOffset(3*4))
+	gl.UniformMatrix4fv(view.modelUniform, 1, false, &b.edgeModel[0])
 	gl.DrawArrays(gl.TRIANGLES, 0, 3*2*3)
 }
 
