@@ -26,13 +26,12 @@ type Point struct {
 
 type Position struct {
 	Shape byte
-	Stamp [STAMP_SIZE]byte
-	Edges [4]byte
 }
 
 type Section struct {
 	X, Y     int
 	position [SECTION_SIZE][SECTION_SIZE][SECTION_Z_SIZE]Position
+	edges    [SECTION_SIZE][SECTION_SIZE]Position
 	origins  [SECTION_SIZE][SECTION_SIZE][SECTION_Z_SIZE]*Point
 }
 
@@ -68,21 +67,21 @@ func (loader *Loader) MoveTo(x, y int) {
 	}
 }
 
-func (loader *Loader) ClearEdge(x, y, z, edgeIndex int) {
-	section, atomX, atomY, atomZ := loader.getPosInSection(x, y, z)
-	section.position[atomX][atomY][atomZ].Edges[edgeIndex] = 0
+func (loader *Loader) ClearEdge(x, y int) {
+	section, atomX, atomY, _ := loader.getPosInSection(x, y, 0)
+	section.edges[atomX][atomY].Shape = 0
 	loader.display.Invalidate()
 }
 
-func (loader *Loader) SetEdge(x, y, z, edgeIndex int, shapeIndex byte) {
-	section, atomX, atomY, atomZ := loader.getPosInSection(x, y, z)
-	section.position[atomX][atomY][atomZ].Edges[edgeIndex] = shapeIndex + 1
+func (loader *Loader) SetEdge(x, y int, shapeIndex byte) {
+	section, atomX, atomY, _ := loader.getPosInSection(x, y, 0)
+	section.edges[atomX][atomY].Shape = shapeIndex + 1
 	loader.display.Invalidate()
 }
 
-func (loader *Loader) GetEdge(x, y, z, edgeIndex int) (byte, bool) {
-	section, atomX, atomY, atomZ := loader.getPosInSection(x, y, z)
-	shapeIndex := section.position[atomX][atomY][atomZ].Edges[edgeIndex]
+func (loader *Loader) GetEdge(x, y int) (byte, bool) {
+	section, atomX, atomY, _ := loader.getPosInSection(x, y, 0)
+	shapeIndex := section.edges[atomX][atomY].Shape
 	if shapeIndex == 0 {
 		return 0, false
 	}
@@ -247,6 +246,10 @@ func (loader *Loader) load(sx, sy int) (*Section, error) {
 		if err != nil {
 			return nil, err
 		}
+		err = dec.Decode(&section.edges)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return section, nil
 }
@@ -268,6 +271,10 @@ func (loader *Loader) save(section *Section) error {
 	fz.Write(b)
 	enc := gob.NewEncoder(fz)
 	err = enc.Encode(section.position)
+	if err != nil {
+		return err
+	}
+	err = enc.Encode(section.edges)
 	if err != nil {
 		return err
 	}

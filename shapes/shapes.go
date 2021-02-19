@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"image"
 	"io/ioutil"
-	"math/rand"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/nfnt/resize"
 
@@ -26,31 +26,26 @@ type ShapeMeta struct {
 }
 
 type Shape struct {
-	Index            int
-	Name             string
-	Image            *image.RGBA
-	Size             [3]float32
-	PixelOffset      [2]float32
-	PixelDim         [2]float32
-	TexOffset        [2]float32
-	TexDim           [2]float32
-	Fudge            float32
-	ImageIndex       int
-	ShapeMeta        *ShapeMeta
-	Flags            map[string]bool
-	EdgeFrom, EdgeTo *Shape
-	HasEdges         bool
-	Edges            map[string][4]*Edge
+	Index       int
+	Name        string
+	Image       *image.RGBA
+	Size        [3]float32
+	PixelOffset [2]float32
+	PixelDim    [2]float32
+	TexOffset   [2]float32
+	TexDim      [2]float32
+	Fudge       float32
+	ImageIndex  int
+	ShapeMeta   *ShapeMeta
+	Flags       map[string]bool
+	Edges       map[string][]*Shape
+	HasEdges    bool
+	EdgePrefix  string
 }
 
 var Shapes []*Shape
 var Names map[string]int = map[string]int{}
 var Images []image.Image
-
-var cornerSuffix [][]string = [][]string{
-	{"w", "e"},
-	{"n", "s"},
-}
 
 func InitShapes(gameDir string) error {
 	bytes, err := ioutil.ReadFile(filepath.Join(gameDir, "shapes.json"))
@@ -129,84 +124,42 @@ func appendShape(name string, shapeDef map[string]interface{}, imageIndex int, i
 		fudge = float32(fudge64)
 	}
 
-	// edge of...
-	var edgeFrom *Shape = findShape("edgeFrom", shapeDef)
-	var edgeTo *Shape = findShape("edgeTo", shapeDef)
+	shape := newShape(
+		len(Shapes),
+		name,
+		size,
+		px, py, pw, ph,
+		img,
+		fudge,
+		imageIndex,
+		shapeMeta,
+		flagsSet,
+	)
 
-	if edgeFrom != nil {
-		for xx := 0; xx < 2; xx++ {
-			for yy := 0; yy < 2; yy++ {
-
-				// make a new image for this corner piece
-				cw := int(pw / 2)
-				ch := int(ph / 2)
-				cx := int(px) + xx*cw
-				cy := int(py) + yy*ch
-				cornerImg := image.NewRGBA(image.Rect(0, 0, int(pw), int(ph)))
-				draw.Draw(cornerImg, image.Rect(xx*cw, yy*ch, xx*cw+cw, yy*ch+ch), img, image.Point{cx, cy}, draw.Src)
-
-				// and add it to Images
-				cornerImageIndex := len(Images)
-				Images = append(Images, cornerImg)
-
-				shape := newShape(
-					len(Shapes),
-					name+"."+cornerSuffix[xx][yy],
-					size,
-					0, 0, pw, ph,
-					cornerImg,
-					fudge,
-					cornerImageIndex,
-					shapeMeta,
-					flagsSet,
-				)
-
-				// link the edges to their shape (and back)
-				shape.EdgeFrom = edgeFrom
-				shape.EdgeTo = edgeTo
-				edgeIndex := yy*2 + xx
-				edgeFrom.HasEdges = true
-				edgeKey := ""
-				if edgeTo != nil {
-					edgeKey = edgeTo.Name
-				}
-				_, ok := edgeFrom.Edges[edgeKey]
-				if ok == false {
-					edgeFrom.Edges[edgeKey] = [4]*Edge{
-						{[]*Shape{}}, {[]*Shape{}}, {[]*Shape{}}, {[]*Shape{}},
-					}
-				}
-				edgeFrom.Edges[edgeKey][edgeIndex].Shapes = append(edgeFrom.Edges[edgeKey][edgeIndex].Shapes, shape)
-
-				Shapes = append(Shapes, shape)
-
-			}
+	// edges
+	refName, ok := shapeDef["ref"]
+	if ok {
+		parts := strings.Split(name, ".")
+		ref := findShape(refName.(string))
+		if _, ok := ref.Edges[parts[2]]; ok {
+			ref.Edges[parts[2]] = append(ref.Edges[parts[2]], shape)
+		} else {
+			ref.Edges[parts[2]] = []*Shape{shape}
 		}
-	} else {
-		Shapes = append(Shapes, newShape(
-			len(Shapes),
-			name,
-			size,
-			px, py, pw, ph,
-			img,
-			fudge,
-			imageIndex,
-			shapeMeta,
-			flagsSet,
-		))
+		ref.HasEdges = true
+		ref.EdgePrefix = parts[0] + "." + parts[1]
 	}
+
+	Shapes = append(Shapes, shape)
 }
 
-func findShape(attr string, shapeDef map[string]interface{}) *Shape {
-	if name, ok := shapeDef[attr].(string); ok {
-		for _, s := range Shapes {
-			if s.Name == name {
-				return s
-			}
+func findShape(name string) *Shape {
+	for _, s := range Shapes {
+		if s.Name == name {
+			return s
 		}
-		panic("Can't find shape for attribute " + attr + ": " + name)
 	}
-	return nil
+	panic("Can't find shape: " + name)
 }
 
 func newShape(index int, name string, size [3]float32, px, py, pw, ph float32, img image.Image, fudge float32, imageIndex int, shapeMeta *ShapeMeta, flagsSet map[string]bool) *Shape {
@@ -223,7 +176,7 @@ func newShape(index int, name string, size [3]float32, px, py, pw, ph float32, i
 		ImageIndex:  imageIndex,
 		ShapeMeta:   shapeMeta,
 		Flags:       flagsSet,
-		Edges:       map[string][4]*Edge{},
+		Edges:       map[string][]*Shape{},
 	}
 
 	// create a half-size thumbnail
@@ -256,16 +209,4 @@ func (shape *Shape) Traverse(fx func(x, y, z int)) {
 			}
 		}
 	}
-}
-
-func (shape *Shape) EdgeShapeIndex(toShapeName string, edgeIndex int) byte {
-	if shape.HasEdges {
-		a, ok := shape.Edges[toShapeName]
-		if ok == false {
-			a = shape.Edges[""]
-		}
-		s := a[edgeIndex].Shapes
-		return byte(s[rand.Intn(len(s))].Index)
-	}
-	return 0
 }

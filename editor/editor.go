@@ -5,6 +5,7 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
+	"math/rand"
 	"strings"
 
 	"github.com/uzudil/isongn/world"
@@ -101,8 +102,6 @@ func (e *Editor) Events() {
 	}
 }
 
-var edgeDefs [4][2]int = [4][2]int{{0, 1}, {1, 0}, {-1, 0}, {0, -1}}
-
 func (e *Editor) setShape() {
 	x := e.app.Loader.X
 	y := e.app.Loader.Y
@@ -115,34 +114,100 @@ func (e *Editor) setShape() {
 	}
 	e.app.Loader.SetShape(x, y, z, byte(e.shapeSelectorIndex))
 
-	for xx := -1; xx <= 1; xx++ {
-		for yy := -1; yy <= 1; yy++ {
-			sx := x + xx*int(shape.Size[0])
-			sy := y + yy*int(shape.Size[1])
-			shapeIndex, _, _, _, found := e.app.Loader.GetShape(sx, sy, z)
-			if found {
-				e.setEdges(sx, sy, z, shapes.Shapes[shapeIndex])
+	if z == 0 {
+		for xx := -1; xx <= 1; xx++ {
+			for yy := -1; yy <= 1; yy++ {
+				sx := x + xx*int(shape.Size[0])
+				sy := y + yy*int(shape.Size[1])
+				shapeIndex, _, _, _, found := e.app.Loader.GetShape(sx, sy, z)
+				if found {
+					e.setEdges(sx, sy, shapes.Shapes[shapeIndex])
+				}
 			}
 		}
 	}
 }
 
-func (e *Editor) setEdges(x, y, z int, shape *shapes.Shape) {
-	for edgeIndex, edgeDef := range edgeDefs {
-		ex := x + edgeDef[0]*int(shape.Size[0])
-		ey := y + edgeDef[1]*int(shape.Size[1])
-		shapeIndex, _, _, _, found := e.app.Loader.GetShape(ex, ey, z)
-		if found && int(shapeIndex) == shape.Index {
-			fmt.Printf("clearing: %s %d\n", shape.Name, edgeIndex)
-			e.app.Loader.ClearEdge(ex, ey, z, edgeIndex)
-		} else if shape.HasEdges {
-			toShapeName := ""
-			if found {
-				toShapeName = shapes.Shapes[shapeIndex].Name
-			}
-			e.app.Loader.SetEdge(ex, ey, z, edgeIndex, shape.EdgeShapeIndex(toShapeName, edgeIndex))
+func (e *Editor) setEdges(x, y int, shape *shapes.Shape) {
+	e.app.Loader.ClearEdge(x, y)
+
+	w := int(shape.Size[0])
+	h := int(shape.Size[1])
+
+	shapeN := e.getEdgeShape(x, y-h)
+	shapeS := e.getEdgeShape(x, y+h)
+	shapeE := e.getEdgeShape(x-w, y)
+	shapeW := e.getEdgeShape(x+w, y)
+
+	var edgeShape *shapes.Shape
+	var edgeName string = ""
+	if shapeN != nil && shapeS != nil && shapeE != nil && shapeW != nil {
+		edgeShape = shapeN
+		edgeName = "nsew"
+	} else if shapeN != nil && shapeS != nil && shapeE != nil {
+		edgeShape = shapeN
+		edgeName = "nse"
+	} else if shapeN != nil && shapeS != nil && shapeW != nil {
+		edgeShape = shapeN
+		edgeName = "nsw"
+	} else if shapeE != nil && shapeS != nil && shapeW != nil {
+		edgeShape = shapeS
+		edgeName = "sew"
+	} else if shapeE != nil && shapeN != nil && shapeW != nil {
+		edgeShape = shapeN
+		edgeName = "new"
+	} else if shapeE != nil && shapeW != nil {
+		edgeShape = shapeE
+		edgeName = "ew"
+	} else if shapeN != nil && shapeS != nil {
+		edgeShape = shapeN
+		edgeName = "ns"
+	} else if shapeN != nil && shapeE != nil {
+		edgeShape = shapeN
+		edgeName = "ne"
+	} else if shapeN != nil && shapeW != nil {
+		edgeShape = shapeN
+		edgeName = "nw"
+	} else if shapeS != nil && shapeE != nil {
+		edgeShape = shapeS
+		edgeName = "se"
+	} else if shapeS != nil && shapeW != nil {
+		edgeShape = shapeS
+		edgeName = "sw"
+	} else if shapeN != nil {
+		edgeShape = shapeN
+		edgeName = "n"
+	} else if shapeS != nil {
+		edgeShape = shapeS
+		edgeName = "s"
+	} else if shapeE != nil {
+		edgeShape = shapeE
+		edgeName = "e"
+	} else if shapeW != nil {
+		edgeShape = shapeW
+		edgeName = "w"
+	}
+
+	if edgeName != "" && edgeShape.Index != shape.Index {
+		if edges, ok := edgeShape.Edges[edgeName]; ok {
+			edge := edges[rand.Intn(len(edges))]
+			e.app.Loader.SetEdge(x, y, byte(edge.Index))
+		} else {
+			fmt.Printf("Can't find edge shape %s for %s\n", edgeName, edgeShape.Name)
 		}
 	}
+}
+
+func (e *Editor) getEdgeShape(x, y int) *shapes.Shape {
+	shapeIndex, _, _, _, found := e.app.Loader.GetShape(x, y, 0)
+	if found == false {
+		return nil
+	}
+	shape := shapes.Shapes[shapeIndex]
+	if shape.HasEdges == false {
+		return nil
+	}
+	return shape
 }
 
 func (e *Editor) findTop() int {

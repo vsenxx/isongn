@@ -28,11 +28,9 @@ type Block struct {
 
 // BlockPos is a displayed Shape at a location
 type BlockPos struct {
-	model     mgl32.Mat4
-	x, y, z   int
-	block     *Block
-	edges     [4]*Block
-	edgeModel mgl32.Mat4
+	model   mgl32.Mat4
+	x, y, z int
+	block   *Block
 }
 
 type View struct {
@@ -48,6 +46,7 @@ type View struct {
 	blocks             []*Block
 	vao                uint32
 	blockPos           [SIZE][SIZE][world.SECTION_Z_SIZE]*BlockPos
+	edges              [SIZE][SIZE]*BlockPos
 	zoom               float64
 	shear              [3]float32
 	Cursor             *BlockPos
@@ -120,20 +119,30 @@ func InitView(zoom float64, camera, shear [3]float32) *View {
 				model.Set(0, 3, float32(x-SIZE/2))
 				model.Set(1, 3, float32(y-SIZE/2))
 				model.Set(2, 3, float32(z))
-				edgeModel := mgl32.Ident4()
-
-				// translate to position
-				edgeModel.Set(0, 3, float32(x-SIZE/2))
-				edgeModel.Set(1, 3, float32(y-SIZE/2))
-				edgeModel.Set(2, 3, float32(z)+1.001)
 
 				view.blockPos[x][y][z] = &BlockPos{
-					x:         x,
-					y:         y,
-					z:         z,
-					model:     model,
-					block:     nil,
-					edgeModel: edgeModel,
+					x:     x,
+					y:     y,
+					z:     z,
+					model: model,
+					block: nil,
+				}
+
+				if z == 0 {
+					edgeModel := mgl32.Ident4()
+
+					// translate to position
+					edgeModel.Set(0, 3, float32(x-SIZE/2))
+					edgeModel.Set(1, 3, float32(y-SIZE/2))
+					edgeModel.Set(2, 3, float32(z)+0.001)
+
+					view.edges[x][y] = &BlockPos{
+						x:     x,
+						y:     y,
+						z:     z,
+						model: edgeModel,
+						block: nil,
+					}
 				}
 			}
 		}
@@ -269,37 +278,37 @@ func (b *Block) vertices() []float32 {
 }
 
 func (view *View) Load(loader *world.Loader) {
-	view.traverse(func(x, y, z int, blockPos *BlockPos) {
+	view.traverse(func(x, y, z int, blockPos *BlockPos, edge *BlockPos) {
 		// reset
 		blockPos.block = nil
-		for edgeIndex := 0; edgeIndex < 4; edgeIndex++ {
-			blockPos.edges[edgeIndex] = nil
-		}
 
-		atomX := loader.X - SIZE/2 + x
-		atomY := loader.Y - SIZE/2 + y
-		atomZ := z
-		shapeIndex, shapeX, shapeY, shapeZ, hasShape := loader.GetShape(atomX, atomY, atomZ)
-		if hasShape && atomX == shapeX && atomY == shapeY && atomZ == shapeZ {
+		worldX := loader.X - SIZE/2 + x
+		worldY := loader.Y - SIZE/2 + y
+		worldZ := z
+		shapeIndex, shapeX, shapeY, shapeZ, hasShape := loader.GetShape(worldX, worldY, worldZ)
+		if hasShape && worldX == shapeX && worldY == shapeY && worldZ == shapeZ {
 			blockPos.block = view.blocks[shapeIndex]
 		}
-		if z == 0 {
-			for edgeIndex := 0; edgeIndex < 4; edgeIndex++ {
-				shapeIndex, hasShape = loader.GetEdge(atomX, atomY, atomZ, edgeIndex)
-				if hasShape {
-					blockPos.edges[edgeIndex] = view.blocks[shapeIndex]
-				}
+		if edge != nil {
+			edge.block = nil
+			shapeIndex, hasShape = loader.GetEdge(worldX, worldY)
+			if hasShape {
+				edge.block = view.blocks[shapeIndex]
 			}
 		}
 	})
 }
 
-func (view *View) traverse(fx func(x, y, z int, blockPos *BlockPos)) {
+func (view *View) traverse(fx func(x, y, z int, blockPos *BlockPos, edge *BlockPos)) {
 	for x := 0; x < SIZE; x++ {
 		for y := 0; y < SIZE; y++ {
 			for z := 0; z < world.SECTION_Z_SIZE; z++ {
-				sprite := view.blockPos[x][y][z]
-				fx(x, y, z, sprite)
+				blockPos := view.blockPos[x][y][z]
+				var edge *BlockPos
+				if z == 0 {
+					edge = view.edges[x][y]
+				}
+				fx(x, y, z, blockPos, edge)
 			}
 		}
 	}
@@ -325,14 +334,12 @@ func (view *View) Draw() {
 	gl.BindVertexArray(view.vao)
 	gl.EnableVertexAttribArray(view.vertAttrib)
 	gl.EnableVertexAttribArray(view.texCoordAttrib)
-	view.traverse(func(x, y, z int, blockPos *BlockPos) {
+	view.traverse(func(x, y, z int, blockPos *BlockPos, edge *BlockPos) {
 		if blockPos.block != nil {
 			blockPos.Draw(view)
 		}
-		for edgeIndex := 0; edgeIndex < 4; edgeIndex++ {
-			if blockPos.edges[edgeIndex] != nil {
-				blockPos.DrawEdge(view, edgeIndex)
-			}
+		if edge != nil && edge.block != nil {
+			edge.Draw(view)
 		}
 	})
 	if view.Cursor.block != nil {
@@ -346,15 +353,6 @@ func (b *BlockPos) Draw(view *View) {
 	gl.VertexAttribPointer(view.vertAttrib, 3, gl.FLOAT, false, 5*4, gl.PtrOffset(0))
 	gl.VertexAttribPointer(view.texCoordAttrib, 2, gl.FLOAT, false, 5*4, gl.PtrOffset(3*4))
 	gl.UniformMatrix4fv(view.modelUniform, 1, false, &b.model[0])
-	gl.DrawArrays(gl.TRIANGLES, 0, 3*2*3)
-}
-
-func (b *BlockPos) DrawEdge(view *View, edgeIndex int) {
-	gl.BindTexture(gl.TEXTURE_2D, b.edges[edgeIndex].texture.texture)
-	gl.BindBuffer(gl.ARRAY_BUFFER, b.edges[edgeIndex].vbo)
-	gl.VertexAttribPointer(view.vertAttrib, 3, gl.FLOAT, false, 5*4, gl.PtrOffset(0))
-	gl.VertexAttribPointer(view.texCoordAttrib, 2, gl.FLOAT, false, 5*4, gl.PtrOffset(3*4))
-	gl.UniformMatrix4fv(view.modelUniform, 1, false, &b.edgeModel[0])
 	gl.DrawArrays(gl.TRIANGLES, 0, 3*2*3)
 }
 
