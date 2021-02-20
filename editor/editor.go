@@ -80,7 +80,7 @@ func (e *Editor) Events() {
 
 	if insertMode || e.app.IsFirstDown(glfw.KeySpace) {
 		e.Z = e.findTop()
-		e.setShape()
+		e.setShape(e.app.Loader.X, e.app.Loader.Y, e.Z, shapes.Shapes[e.shapeSelectorIndex])
 	}
 	if e.app.IsFirstDown(glfw.KeyE) && e.Z > 0 {
 		shapes.Shapes[e.shapeSelectorIndex].Traverse(func(xx, yy, zz int) {
@@ -92,6 +92,9 @@ func (e *Editor) Events() {
 	if e.app.IsFirstDown(glfw.KeyX) {
 		e.app.Loader.SaveAll()
 	}
+	if e.app.IsFirstDown(glfw.KeyF) {
+		e.fill()
+	}
 
 	if e.shapeSelectorUpdate || e.app.Reload {
 		e.Z = e.findTop()
@@ -100,14 +103,37 @@ func (e *Editor) Events() {
 	}
 }
 
-func (e *Editor) setShape() {
-	x := e.app.Loader.X
-	y := e.app.Loader.Y
-	z := e.Z
+func (e *Editor) fill() {
 	shape := shapes.Shapes[e.shapeSelectorIndex]
+	shapeIndex, _, _, _, found := e.app.Loader.GetShape(e.app.Loader.X, e.app.Loader.Y, 0)
+	var replaceShape *shapes.Shape
+	if found {
+		replaceShape = shapes.Shapes[shapeIndex]
+	}
 	if strings.HasPrefix(shape.Name, "ground.") {
-		x = (x / 4) * 4
-		y = (y / 4) * 4
+		e.fillAt(e.app.Loader.X, e.app.Loader.Y, shape, replaceShape)
+	}
+}
+
+func (e *Editor) fillAt(x, y int, shape, replaceShape *shapes.Shape) {
+	shapeIndex, _, _, _, found := e.app.Loader.GetShape(x, y, 0)
+	if found == false || int(shapeIndex) == replaceShape.Index {
+		e.setShape(x, y, 0, shape)
+		w := int(shape.Size[0])
+		h := int(shape.Size[1])
+		e.fillAt(x-w, y, shape, replaceShape)
+		e.fillAt(x+w, y, shape, replaceShape)
+		e.fillAt(x, y-h, shape, replaceShape)
+		e.fillAt(x, y+h, shape, replaceShape)
+	}
+}
+
+func (e *Editor) setShape(x, y, z int, shape *shapes.Shape) {
+	if strings.HasPrefix(shape.Name, "ground.") {
+		w := int(shape.Size[0])
+		h := int(shape.Size[1])
+		x = (x / w) * w
+		y = (y / h) * h
 		z = 0
 	}
 	e.app.Loader.SetShape(x, y, z, byte(e.shapeSelectorIndex))
