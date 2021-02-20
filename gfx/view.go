@@ -288,6 +288,10 @@ func (view *View) Load(loader *world.Loader) {
 		shapeIndex, shapeX, shapeY, shapeZ, hasShape := loader.GetShape(worldX, worldY, worldZ)
 		if hasShape && worldX == shapeX && worldY == shapeY && worldZ == shapeZ {
 			blockPos.block = view.blocks[shapeIndex]
+			shape := shapes.Shapes[int(shapeIndex)]
+			blockPos.model.Set(0, 3, float32(x-SIZE/2)+shape.Offset[0])
+			blockPos.model.Set(1, 3, float32(y-SIZE/2)+shape.Offset[1])
+			blockPos.model.Set(2, 3, float32(z)+shape.Offset[2])
 		}
 		if edge != nil {
 			edge.block = nil

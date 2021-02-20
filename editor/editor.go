@@ -1,11 +1,9 @@
 package editor
 
 import (
-	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
-	"math/rand"
 	"strings"
 
 	"github.com/uzudil/isongn/world"
@@ -189,11 +187,9 @@ func (e *Editor) setEdges(x, y int, shape *shapes.Shape) {
 	}
 
 	if edgeName != "" && edgeShape.Index != shape.Index {
-		if edges, ok := edgeShape.Edges[edgeName]; ok {
-			edge := edges[rand.Intn(len(edges))]
+		edge := edgeShape.GetEdge(shape.Name, edgeName)
+		if edge != nil {
 			e.app.Loader.SetEdge(x, y, byte(edge.Index))
-		} else {
-			fmt.Printf("Can't find edge shape %s for %s\n", edgeName, edgeShape.Name)
 		}
 	}
 }

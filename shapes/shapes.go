@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"strings"
@@ -38,9 +39,10 @@ type Shape struct {
 	ImageIndex  int
 	ShapeMeta   *ShapeMeta
 	Flags       map[string]bool
-	Edges       map[string][]*Shape
+	Edges       map[string]map[string][]*Shape
 	HasEdges    bool
 	EdgePrefix  string
+	Offset      [3]float32
 }
 
 var Shapes []*Shape
@@ -124,6 +126,14 @@ func appendShape(name string, shapeDef map[string]interface{}, imageIndex int, i
 		fudge = float32(fudge64)
 	}
 
+	// offset
+	offset := [3]float32{}
+	if offsetI, ok := shapeDef["offset"].([]interface{}); ok {
+		offset[0] = float32(offsetI[0].(float64))
+		offset[1] = float32(offsetI[1].(float64))
+		offset[2] = float32(offsetI[2].(float64))
+	}
+
 	shape := newShape(
 		len(Shapes),
 		name,
@@ -134,23 +144,51 @@ func appendShape(name string, shapeDef map[string]interface{}, imageIndex int, i
 		imageIndex,
 		shapeMeta,
 		flagsSet,
+		offset,
 	)
 
 	// edges
 	refName, ok := shapeDef["ref"]
 	if ok {
+		targetI, ok := shapeDef["target"]
+		var target string
+		if ok == false {
+			target = "default"
+		} else {
+			target = targetI.(string)
+		}
+
 		parts := strings.Split(name, ".")
 		ref := findShape(refName.(string))
-		if _, ok := ref.Edges[parts[2]]; ok {
-			ref.Edges[parts[2]] = append(ref.Edges[parts[2]], shape)
+		if _, ok := ref.Edges[target]; ok == false {
+			ref.Edges[target] = map[string][]*Shape{}
+		}
+		if _, ok := ref.Edges[target][parts[2]]; ok {
+			ref.Edges[target][parts[2]] = append(ref.Edges[target][parts[2]], shape)
 		} else {
-			ref.Edges[parts[2]] = []*Shape{shape}
+			ref.Edges[target][parts[2]] = []*Shape{shape}
 		}
 		ref.HasEdges = true
 		ref.EdgePrefix = parts[0] + "." + parts[1]
 	}
 
 	Shapes = append(Shapes, shape)
+}
+
+func (shape *Shape) GetEdge(shapeName, edgeName string) *Shape {
+	edgeMap, ok := shape.Edges[shapeName]
+	if ok == false {
+		edgeMap, ok = shape.Edges["default"]
+	}
+	if ok == false {
+		fmt.Printf("No edges for shape %s\n", shape.Name)
+		return nil
+	}
+	if edges, ok := edgeMap[edgeName]; ok {
+		return edges[rand.Intn(len(edges))]
+	}
+	fmt.Printf("Can't find edge shape %s for %s\n", edgeName, shape.Name)
+	return nil
 }
 
 func findShape(name string) *Shape {
@@ -162,7 +200,7 @@ func findShape(name string) *Shape {
 	panic("Can't find shape: " + name)
 }
 
-func newShape(index int, name string, size [3]float32, px, py, pw, ph float32, img image.Image, fudge float32, imageIndex int, shapeMeta *ShapeMeta, flagsSet map[string]bool) *Shape {
+func newShape(index int, name string, size [3]float32, px, py, pw, ph float32, img image.Image, fudge float32, imageIndex int, shapeMeta *ShapeMeta, flagsSet map[string]bool, offset [3]float32) *Shape {
 	imageBounds := img.Bounds()
 	shape := &Shape{
 		Index:       len(Shapes),
@@ -176,7 +214,8 @@ func newShape(index int, name string, size [3]float32, px, py, pw, ph float32, i
 		ImageIndex:  imageIndex,
 		ShapeMeta:   shapeMeta,
 		Flags:       flagsSet,
-		Edges:       map[string][]*Shape{},
+		Edges:       map[string]map[string][]*Shape{},
+		Offset:      offset,
 	}
 
 	// create a half-size thumbnail
