@@ -40,8 +40,6 @@ type Shape struct {
 	ShapeMeta   *ShapeMeta
 	Flags       map[string]bool
 	Edges       map[string]map[string][]*Shape
-	HasEdges    bool
-	EdgePrefix  string
 	Offset      [3]float32
 }
 
@@ -168,11 +166,21 @@ func appendShape(name string, shapeDef map[string]interface{}, imageIndex int, i
 		} else {
 			ref.Edges[target][parts[2]] = []*Shape{shape}
 		}
-		ref.HasEdges = true
-		ref.EdgePrefix = parts[0] + "." + parts[1]
 	}
 
 	Shapes = append(Shapes, shape)
+}
+
+func (shape *Shape) HasEdges(shapeName string) bool {
+	_, ok := shape.Edges[shapeName]
+	if ok {
+		return true
+	}
+	_, ok = shape.Edges["default"]
+	if ok {
+		return true
+	}
+	return false
 }
 
 func (shape *Shape) GetEdge(shapeName, edgeName string) *Shape {

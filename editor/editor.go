@@ -105,19 +105,19 @@ func (e *Editor) Events() {
 
 func (e *Editor) fill() {
 	shape := shapes.Shapes[e.shapeSelectorIndex]
-	shapeIndex, _, _, _, found := e.app.Loader.GetShape(e.app.Loader.X, e.app.Loader.Y, 0)
-	var replaceShape *shapes.Shape
-	if found {
-		replaceShape = shapes.Shapes[shapeIndex]
-	}
 	if strings.HasPrefix(shape.Name, "ground.") {
+		shapeIndex, _, _, _, found := e.app.Loader.GetShape(e.app.Loader.X, e.app.Loader.Y, 0)
+		var replaceShape *shapes.Shape
+		if found {
+			replaceShape = shapes.Shapes[shapeIndex]
+		}
 		e.fillAt(e.app.Loader.X, e.app.Loader.Y, shape, replaceShape)
 	}
 }
 
 func (e *Editor) fillAt(x, y int, shape, replaceShape *shapes.Shape) {
 	shapeIndex, _, _, _, found := e.app.Loader.GetShape(x, y, 0)
-	if found == false || int(shapeIndex) == replaceShape.Index {
+	if (replaceShape == nil && found == false) || (replaceShape != nil && int(shapeIndex) == replaceShape.Index) {
 		e.setShape(x, y, 0, shape)
 		w := int(shape.Size[0])
 		h := int(shape.Size[1])
@@ -158,10 +158,10 @@ func (e *Editor) setEdges(x, y int, shape *shapes.Shape) {
 	w := int(shape.Size[0])
 	h := int(shape.Size[1])
 
-	shapeN := e.getEdgeShape(x, y-h)
-	shapeS := e.getEdgeShape(x, y+h)
-	shapeE := e.getEdgeShape(x-w, y)
-	shapeW := e.getEdgeShape(x+w, y)
+	shapeN := e.getEdgeShape(x, y-h, shape)
+	shapeS := e.getEdgeShape(x, y+h, shape)
+	shapeE := e.getEdgeShape(x-w, y, shape)
+	shapeW := e.getEdgeShape(x+w, y, shape)
 
 	var edgeShape *shapes.Shape
 	var edgeName string = ""
@@ -220,16 +220,16 @@ func (e *Editor) setEdges(x, y int, shape *shapes.Shape) {
 	}
 }
 
-func (e *Editor) getEdgeShape(x, y int) *shapes.Shape {
+func (e *Editor) getEdgeShape(x, y int, target *shapes.Shape) *shapes.Shape {
 	shapeIndex, _, _, _, found := e.app.Loader.GetShape(x, y, 0)
 	if found == false {
 		return nil
 	}
 	shape := shapes.Shapes[shapeIndex]
-	if shape.HasEdges == false {
-		return nil
+	if shape.HasEdges(target.Name) {
+		return shape
 	}
-	return shape
+	return nil
 }
 
 func (e *Editor) findTop() int {
