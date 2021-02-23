@@ -24,7 +24,7 @@ func init() {
 }
 
 func main() {
-	gameDir := flag.String("game", ".", "Location of the game assets directory")
+	gameDir := flag.String("game", "./game", "Location of the game assets directory")
 	mode := flag.String("mode", "runner", "Game or Editor mode")
 	winWidth := flag.Int("width", 800, "Window width (default: 800)")
 	winHeight := flag.Int("height", 600, "Window height (default: 600)")

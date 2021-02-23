@@ -27,20 +27,21 @@ type ShapeMeta struct {
 }
 
 type Shape struct {
-	Index       int
-	Name        string
-	Image       *image.RGBA
-	Size        [3]float32
-	PixelOffset [2]float32
-	PixelDim    [2]float32
-	TexOffset   [2]float32
-	TexDim      [2]float32
-	Fudge       float32
-	ImageIndex  int
-	ShapeMeta   *ShapeMeta
-	Flags       map[string]bool
-	Edges       map[string]map[string][]*Shape
-	Offset      [3]float32
+	Index         int
+	Name          string
+	Image         *image.RGBA
+	Size          [3]float32
+	PixelOffset   [2]float32
+	PixelDim      [2]float32
+	TexOffset     [2]float32
+	TexDim        [2]float32
+	Fudge         float32
+	ImageIndex    int
+	ShapeMeta     *ShapeMeta
+	Flags         map[string]bool
+	Edges         map[string]map[string][]*Shape
+	Offset        [3]float32
+	EditorVisible bool
 }
 
 var Shapes []*Shape
@@ -79,19 +80,19 @@ func InitShapes(gameDir string) error {
 		}
 		imageIndex := len(Images)
 		Images = append(Images, img)
-		for _, s := range shapes {
+		for index, s := range shapes {
 			shapeDef := s.(map[string]interface{})
 			name := shapeDef["name"].(string)
 			fmt.Printf("\tProcessing %s\n", name)
 			Names[name] = len(Shapes)
-			appendShape(name, shapeDef, imageIndex, img, shapeMeta)
+			appendShape(index, name, shapeDef, imageIndex, img, shapeMeta)
 		}
 	}
 	fmt.Printf("Loaded %d shapes.\n", len(Shapes))
 	return nil
 }
 
-func appendShape(name string, shapeDef map[string]interface{}, imageIndex int, img image.Image, shapeMeta *ShapeMeta) {
+func appendShape(index int, name string, shapeDef map[string]interface{}, imageIndex int, img image.Image, shapeMeta *ShapeMeta) {
 	// flags
 	flagsSet := map[string]bool{}
 	flags, ok := shapeDef["flags"]
@@ -133,7 +134,7 @@ func appendShape(name string, shapeDef map[string]interface{}, imageIndex int, i
 	}
 
 	shape := newShape(
-		len(Shapes),
+		imageIndex*0x100+index, // each image can contain max 256 shapes
 		name,
 		size,
 		px, py, pw, ph,
@@ -166,8 +167,15 @@ func appendShape(name string, shapeDef map[string]interface{}, imageIndex int, i
 		} else {
 			ref.Edges[target][parts[2]] = []*Shape{shape}
 		}
+	} else {
+		shape.EditorVisible = true
 	}
 
+	// add a gap, if needed
+	for len(Shapes) < shape.Index-1 {
+		Shapes = append(Shapes, nil)
+	}
+	// add shape
 	Shapes = append(Shapes, shape)
 }
 
@@ -211,7 +219,7 @@ func findShape(name string) *Shape {
 func newShape(index int, name string, size [3]float32, px, py, pw, ph float32, img image.Image, fudge float32, imageIndex int, shapeMeta *ShapeMeta, flagsSet map[string]bool, offset [3]float32) *Shape {
 	imageBounds := img.Bounds()
 	shape := &Shape{
-		Index:       len(Shapes),
+		Index:       index,
 		Name:        name,
 		Size:        size,
 		PixelOffset: [2]float32{px, py},

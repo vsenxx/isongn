@@ -25,7 +25,7 @@ type Point struct {
 }
 
 type Position struct {
-	Shape byte
+	Shape int
 }
 
 type Section struct {
@@ -73,13 +73,13 @@ func (loader *Loader) ClearEdge(x, y int) {
 	loader.display.Invalidate()
 }
 
-func (loader *Loader) SetEdge(x, y int, shapeIndex byte) {
+func (loader *Loader) SetEdge(x, y int, shapeIndex int) {
 	section, atomX, atomY, _ := loader.getPosInSection(x, y, 0)
 	section.edges[atomX][atomY].Shape = shapeIndex + 1
 	loader.display.Invalidate()
 }
 
-func (loader *Loader) GetEdge(x, y int) (byte, bool) {
+func (loader *Loader) GetEdge(x, y int) (int, bool) {
 	section, atomX, atomY, _ := loader.getPosInSection(x, y, 0)
 	shapeIndex := section.edges[atomX][atomY].Shape
 	if shapeIndex == 0 {
@@ -88,7 +88,7 @@ func (loader *Loader) GetEdge(x, y int) (byte, bool) {
 	return shapeIndex - 1, true
 }
 
-func (loader *Loader) SetShape(x, y, z int, shapeIndex byte) bool {
+func (loader *Loader) SetShape(x, y, z int, shapeIndex int) bool {
 	section, atomX, atomY, atomZ := loader.getPosInSection(x, y, z)
 	section.position[atomX][atomY][atomZ].Shape = shapeIndex + 1
 	// mark the shape's origin
@@ -119,7 +119,7 @@ func (loader *Loader) EraseShape(x, y, z int) bool {
 	return false
 }
 
-func (loader *Loader) GetShape(worldX, worldY, worldZ int) (byte, int, int, int, bool) {
+func (loader *Loader) GetShape(worldX, worldY, worldZ int) (int, int, int, int, bool) {
 	section, atomX, atomY, atomZ := loader.getPosInSection(worldX, worldY, worldZ)
 	if section.origins[atomX][atomY][atomZ] != nil {
 		o := section.origins[atomX][atomY][atomZ]

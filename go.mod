@@ -7,4 +7,5 @@ require (
 	github.com/go-gl/glfw/v3.3/glfw v0.0.0-20201108214237-06ea97f0c265
 	github.com/go-gl/mathgl v1.0.0
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
+	github.com/uzudil/bscript v0.0.0-20210223011105-972602b7a312
 )

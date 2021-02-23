@@ -20,6 +20,7 @@ type Game interface {
 	Init(app *App)
 	Name() string
 	Events()
+	GetZ() int
 }
 
 type KeyPress struct {
@@ -89,6 +90,7 @@ func NewApp(game Game, gameDir string, windowWidth, windowHeight int, targetFps 
 	app.Window.SetKeyCallback(app.Keypressed)
 	app.Window.SetScrollCallback(app.MouseScroll)
 	app.frameBuffer = NewFrameBuffer(int32(width), int32(height))
+	InitScript()
 	err := shapes.InitShapes(gameDir)
 	if err != nil {
 		panic(err)

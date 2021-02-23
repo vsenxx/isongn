@@ -38,3 +38,7 @@ func (runner *Runner) Events() {
 	}
 	runner.app.Loader.MoveTo(ox, oy)
 }
+
+func (runner *Runner) GetZ() int {
+	return 0
+}

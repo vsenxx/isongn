@@ -4,8 +4,10 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
+	"path/filepath"
 	"strings"
 
+	"github.com/uzudil/bscript/bscript"
 	"github.com/uzudil/isongn/world"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
@@ -18,6 +20,8 @@ type Editor struct {
 	shapeSelectorIndex  int
 	shapeSelectorUpdate bool
 	Z                   int
+	ctx                 *bscript.Context
+	command             *bscript.Command
 }
 
 func NewEditor() *Editor {
@@ -28,6 +32,28 @@ func NewEditor() *Editor {
 
 func (e *Editor) Init(app *gfx.App) {
 	e.app = app
+
+	// compile the editor script code
+	_, ctx, err := bscript.Build(
+		filepath.Join(e.app.Config.GameDir, "src", "editor.b"),
+		false,
+		map[string]interface{}{
+			"app":    app,
+			"editor": e,
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	e.ctx = ctx
+
+	// create the editor bscript calls
+	e.command = &bscript.Command{}
+	err = bscript.CommandParser.ParseString("editorCommand();", e.command)
+	if err != nil {
+		panic(err)
+	}
+
 	// add a ui
 	e.app.Ui.Add(int(e.app.Width)-150, 0, 150, int(e.app.Height), e.shapeSelectorContents)
 }
@@ -62,12 +88,22 @@ func (e *Editor) isMoveKey() (int, int, bool) {
 
 func (e *Editor) Events() {
 	if e.app.IsDownAlt1(glfw.KeyLeftBracket) && e.shapeSelectorIndex > 0 {
-		e.shapeSelectorIndex--
-		e.shapeSelectorUpdate = true
+		for i := e.shapeSelectorIndex - 1; i >= 0; i-- {
+			if shapes.Shapes[i] != nil && shapes.Shapes[i].EditorVisible {
+				e.shapeSelectorIndex = i
+				e.shapeSelectorUpdate = true
+				break
+			}
+		}
 	}
 	if e.app.IsDownAlt1(glfw.KeyRightBracket) && e.shapeSelectorIndex < len(shapes.Shapes)-1 {
-		e.shapeSelectorIndex++
-		e.shapeSelectorUpdate = true
+		for i := e.shapeSelectorIndex + 1; i < len(shapes.Shapes); i++ {
+			if shapes.Shapes[i] != nil && shapes.Shapes[i].EditorVisible {
+				e.shapeSelectorIndex = i
+				e.shapeSelectorUpdate = true
+				break
+			}
+		}
 	}
 
 	shape := shapes.Shapes[e.shapeSelectorIndex]
@@ -78,9 +114,11 @@ func (e *Editor) Events() {
 	}
 	e.app.Loader.MoveTo(e.app.Loader.X+dx, e.app.Loader.Y+dy)
 
-	if insertMode || e.app.IsFirstDown(glfw.KeySpace) {
+	f := e.app.IsFirstDown(glfw.KeySpace)
+	ff := e.app.IsDownMod(glfw.KeySpace, glfw.ModShift)
+	if insertMode || f || ff {
 		e.Z = e.findTop()
-		e.setShape(e.app.Loader.X, e.app.Loader.Y, e.Z, shapes.Shapes[e.shapeSelectorIndex])
+		e.setShape(e.app.Loader.X, e.app.Loader.Y, e.Z, shapes.Shapes[e.shapeSelectorIndex], ff)
 	}
 	if e.app.IsFirstDown(glfw.KeyE) && e.Z > 0 {
 		shapes.Shapes[e.shapeSelectorIndex].Traverse(func(xx, yy, zz int) {
@@ -96,11 +134,18 @@ func (e *Editor) Events() {
 		e.fill()
 	}
 
+	// call bscript
+	e.command.Evaluate(e.ctx)
+
 	if e.shapeSelectorUpdate || e.app.Reload {
 		e.Z = e.findTop()
 		e.app.View.SetCursor(e.shapeSelectorIndex, e.Z)
 		e.app.Invalidate()
 	}
+}
+
+func (e *Editor) GetZ() int {
+	return e.Z
 }
 
 func (e *Editor) fill() {
@@ -118,7 +163,7 @@ func (e *Editor) fill() {
 func (e *Editor) fillAt(x, y int, shape, replaceShape *shapes.Shape) {
 	shapeIndex, _, _, _, found := e.app.Loader.GetShape(x, y, 0)
 	if (replaceShape == nil && found == false) || (replaceShape != nil && int(shapeIndex) == replaceShape.Index) {
-		e.setShape(x, y, 0, shape)
+		e.setShape(x, y, 0, shape, false)
 		w := int(shape.Size[0])
 		h := int(shape.Size[1])
 		e.fillAt(x-w, y, shape, replaceShape)
@@ -128,7 +173,7 @@ func (e *Editor) fillAt(x, y int, shape, replaceShape *shapes.Shape) {
 	}
 }
 
-func (e *Editor) setShape(x, y, z int, shape *shapes.Shape) {
+func (e *Editor) setShape(x, y, z int, shape *shapes.Shape, skipEdge bool) {
 	if strings.HasPrefix(shape.Name, "ground.") {
 		w := int(shape.Size[0])
 		h := int(shape.Size[1])
@@ -136,16 +181,20 @@ func (e *Editor) setShape(x, y, z int, shape *shapes.Shape) {
 		y = (y / h) * h
 		z = 0
 	}
-	e.app.Loader.SetShape(x, y, z, byte(e.shapeSelectorIndex))
+	e.app.Loader.SetShape(x, y, z, e.shapeSelectorIndex)
 
-	if z == 0 {
-		for xx := -1; xx <= 1; xx++ {
-			for yy := -1; yy <= 1; yy++ {
-				sx := x + xx*int(shape.Size[0])
-				sy := y + yy*int(shape.Size[1])
-				shapeIndex, _, _, _, found := e.app.Loader.GetShape(sx, sy, z)
-				if found {
-					e.setEdges(sx, sy, shapes.Shapes[shapeIndex])
+	if skipEdge {
+		e.app.Loader.ClearEdge(x, y)
+	} else {
+		if z == 0 {
+			for xx := -1; xx <= 1; xx++ {
+				for yy := -1; yy <= 1; yy++ {
+					sx := x + xx*int(shape.Size[0])
+					sy := y + yy*int(shape.Size[1])
+					shapeIndex, _, _, _, found := e.app.Loader.GetShape(sx, sy, z)
+					if found {
+						e.setEdges(sx, sy, shapes.Shapes[shapeIndex])
+					}
 				}
 			}
 		}
@@ -215,7 +264,7 @@ func (e *Editor) setEdges(x, y int, shape *shapes.Shape) {
 	if edgeName != "" && edgeShape.Index != shape.Index {
 		edge := edgeShape.GetEdge(shape.Name, edgeName)
 		if edge != nil {
-			e.app.Loader.SetEdge(x, y, byte(edge.Index))
+			e.app.Loader.SetEdge(x, y, edge.Index)
 		}
 	}
 }
@@ -259,13 +308,15 @@ func (e *Editor) shapeSelectorContents(panel *gfx.Panel) bool {
 		y := 0
 		for i := e.shapeSelectorIndex; i < len(shapes.Shapes) && y < panel.H; i++ {
 			shape := shapes.Shapes[i]
-			shapeW := shape.Image.Bounds().Dx()
-			shapeH := shape.Image.Bounds().Dy()
-			if i == e.shapeSelectorIndex {
-				draw.Draw(panel.Rgba, image.Rect(0, y, 150, y+shapeH), &image.Uniform{color.RGBA{0xff, 0xa0, 0, 0xff}}, image.ZP, draw.Src)
+			if shape != nil && shape.EditorVisible {
+				shapeW := shape.Image.Bounds().Dx()
+				shapeH := shape.Image.Bounds().Dy()
+				if i == e.shapeSelectorIndex {
+					draw.Draw(panel.Rgba, image.Rect(0, y, 150, y+shapeH), &image.Uniform{color.RGBA{0xff, 0xa0, 0, 0xff}}, image.ZP, draw.Src)
+				}
+				draw.Draw(panel.Rgba, image.Rect(0, y, shapeW, y+shapeH), shape.Image, image.Point{0, 0}, draw.Over)
+				y += shape.Image.Bounds().Dy()
 			}
-			draw.Draw(panel.Rgba, image.Rect(0, y, shapeW, y+shapeH), shape.Image, image.Point{0, 0}, draw.Over)
-			y += shape.Image.Bounds().Dy()
 		}
 		e.shapeSelectorUpdate = false
 		return true

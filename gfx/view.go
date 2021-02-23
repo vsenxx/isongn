@@ -106,7 +106,11 @@ func InitView(zoom float64, camera, shear [3]float32) *View {
 	// create a block for each shape
 	view.blocks = []*Block{}
 	for index, shape := range shapes.Shapes {
-		view.blocks = append(view.blocks, view.newBlock(int32(index), shape))
+		if shape == nil {
+			view.blocks = append(view.blocks, nil)
+		} else {
+			view.blocks = append(view.blocks, view.newBlock(int32(index), shape))
+		}
 	}
 	fmt.Printf("Created %d blocks.\n", len(view.blocks))
 
@@ -330,6 +334,12 @@ func (view *View) HideCursor() {
 	view.Cursor.block = nil
 }
 
+type DrawState struct {
+	init    bool
+	texture uint32
+	vbo     uint32
+}
+
 func (view *View) Draw() {
 	gl.Enable(gl.DEPTH_TEST)
 	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
@@ -338,26 +348,34 @@ func (view *View) Draw() {
 	gl.BindVertexArray(view.vao)
 	gl.EnableVertexAttribArray(view.vertAttrib)
 	gl.EnableVertexAttribArray(view.texCoordAttrib)
+	state := DrawState{}
 	view.traverse(func(x, y, z int, blockPos *BlockPos, edge *BlockPos) {
 		if blockPos.block != nil {
-			blockPos.Draw(view)
+			blockPos.Draw(view, &state)
 		}
 		if edge != nil && edge.block != nil {
-			edge.Draw(view)
+			edge.Draw(view, &state)
 		}
 	})
 	if view.Cursor.block != nil {
-		view.Cursor.Draw(view)
+		view.Cursor.Draw(view, &state)
 	}
 }
 
-func (b *BlockPos) Draw(view *View) {
-	gl.BindTexture(gl.TEXTURE_2D, b.block.texture.texture)
-	gl.BindBuffer(gl.ARRAY_BUFFER, b.block.vbo)
-	gl.VertexAttribPointer(view.vertAttrib, 3, gl.FLOAT, false, 5*4, gl.PtrOffset(0))
-	gl.VertexAttribPointer(view.texCoordAttrib, 2, gl.FLOAT, false, 5*4, gl.PtrOffset(3*4))
+func (b *BlockPos) Draw(view *View, state *DrawState) {
+	if !state.init || state.texture != b.block.texture.texture {
+		gl.BindTexture(gl.TEXTURE_2D, b.block.texture.texture)
+		state.texture = b.block.texture.texture
+	}
+	if !state.init || state.vbo != b.block.vbo {
+		gl.BindBuffer(gl.ARRAY_BUFFER, b.block.vbo)
+		gl.VertexAttribPointer(view.vertAttrib, 3, gl.FLOAT, false, 5*4, gl.PtrOffset(0))
+		gl.VertexAttribPointer(view.texCoordAttrib, 2, gl.FLOAT, false, 5*4, gl.PtrOffset(3*4))
+		state.vbo = b.block.vbo
+	}
 	gl.UniformMatrix4fv(view.modelUniform, 1, false, &b.model[0])
 	gl.DrawArrays(gl.TRIANGLES, 0, 3*2*3)
+	state.init = true
 }
 
 func (view *View) Zoom(zoom float64) {
