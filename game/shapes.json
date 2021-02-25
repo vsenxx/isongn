@@ -102,7 +102,24 @@
             { "name": "shelf.book.x", "size": [ 4, 1, 5], "pos": [776, 368] },
             { "name": "shelf.book.y", "size": [ 1, 4, 5], "pos": [816, 368] },
             { "name": "shelf.book.y", "size": [ 1, 4, 5], "pos": [864, 368] },
-            { "name": "bed.x", "size": [ 6, 3, 2], "pos": [912, 368] }
+            { "name": "bed.x", "size": [ 6, 3, 2], "pos": [912, 368] },
+            { "name": "step.y", "size": [ 2, 4, 1], "pos": [48, 24] },
+            { "name": "well", "size": [ 6, 2, 8], "pos": [0, 80] },
+            { "name": "stalagmite.large", "size": [ 3, 3, 4], "pos": [0, 264] },
+            { "name": "stalagmite.small", "size": [ 2, 2, 2], "pos": [64, 288] },
+            { "name": "plant.flower.green.large", "size": [ 2, 2, 2], "pos": [112, 288] },
+            { "name": "plant.flower.green.small", "size": [ 1, 1, 1], "pos": [152, 296] },
+            { "name": "plant.flower.red.large", "size": [ 2, 2, 2], "pos": [112, 240] },
+            { "name": "plant.flower.red.small", "size": [ 1, 1, 1], "pos": [152, 264] },
+            { "name": "plant.flower.yellow.large", "size": [ 2, 2, 2], "pos": [112, 192] },
+            { "name": "plant.flower.yellow.small", "size": [ 1, 1, 1], "pos": [152, 232] },
+            { "name": "plank.y", "size": [ 2, 7, 1], "pos": [104, 96] },
+            { "name": "plank.x", "size": [ 7, 2, 1], "pos": [192, 96] },
+            { "name": "telescope", "size": [ 3, 3, 2], "pos": [400, 456] },
+            { "name": "fence.black.x", "size": [ 4, 1, 2], "pos": [456, 472] },
+            { "name": "fence.black.y", "size": [ 1, 4, 2], "pos": [496, 472] },
+            { "name": "candolabra.y", "size": [ 1, 2, 5], "pos": [544, 464] },
+            { "name": "candolabra.x", "size": [ 2, 1, 5], "pos": [568, 464] }
         ]
     },
     {

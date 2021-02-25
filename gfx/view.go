@@ -254,7 +254,7 @@ func (b *Block) vertices() []float32 {
 		0, h, 0, 1 - f, (h + d) / ty,
 		0, h, d, 1 - f, (h - f) / ty,
 		0, 0, d, w / tx, f,
-		w, h, d, h / tx, (w + h - 6*f) / ty,
+		w, h, d, h / tx, (w + h - f) / ty,
 	}
 
 	// scale and translate tex coords to within larger texture
@@ -342,6 +342,7 @@ type DrawState struct {
 
 func (view *View) Draw() {
 	gl.Enable(gl.DEPTH_TEST)
+	gl.ClearColor(0, 0, 0, 1)
 	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 	gl.ActiveTexture(gl.TEXTURE0)
 	gl.UseProgram(view.program)

@@ -61,7 +61,7 @@ type App struct {
 	windowWidth, windowHeight       int
 	windowWidthDpi, windowHeightDpi int
 	dpiX, dpiY                      float32
-	frameBuffer                     *FrameBuffer
+	frameBuffer, uiFrameBuffer      *FrameBuffer
 	Reload                          bool
 }
 
@@ -89,7 +89,8 @@ func NewApp(game Game, gameDir string, windowWidth, windowHeight int, targetFps 
 	app.windowHeightDpi = int(float32(app.windowHeight) * app.dpiY)
 	app.Window.SetKeyCallback(app.Keypressed)
 	app.Window.SetScrollCallback(app.MouseScroll)
-	app.frameBuffer = NewFrameBuffer(int32(width), int32(height))
+	app.frameBuffer = NewFrameBuffer(int32(width), int32(height), true)
+	app.uiFrameBuffer = NewFrameBuffer(int32(width), int32(height), false)
 	InitScript()
 	err := shapes.InitShapes(gameDir)
 	if err != nil {
@@ -267,7 +268,7 @@ func (app *App) Run() {
 	// Configure global settings
 	gl.Enable(gl.DEPTH_TEST)
 	gl.DepthFunc(gl.LESS)
-	gl.ClearColor(0, 0, 0, 1)
+	// gl.ClearColor(0, 0, 0, 0)
 
 	last := glfw.GetTime()
 	for !app.Window.ShouldClose() {
@@ -277,9 +278,6 @@ func (app *App) Run() {
 		// show FPS in window title
 		app.CalcFps()
 
-		// set to render to frame buffer
-		app.frameBuffer.Enable(app.Width, app.Height)
-
 		// handle events
 		app.Game.Events()
 
@@ -288,11 +286,14 @@ func (app *App) Run() {
 			app.View.Load(app.Loader)
 			app.Reload = false
 		}
-		app.View.Draw()
-		app.Ui.Draw()
 
-		// render framebuffer to screen
+		app.frameBuffer.Enable(app.Width, app.Height)
+		app.View.Draw()
 		app.frameBuffer.Draw(app.windowWidthDpi, app.windowHeightDpi)
+
+		app.uiFrameBuffer.Enable(app.Width, app.Height)
+		app.Ui.Draw()
+		app.uiFrameBuffer.Draw(app.windowWidthDpi, app.windowHeightDpi)
 
 		// Maintenance
 		app.Window.SwapBuffers()

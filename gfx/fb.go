@@ -11,11 +11,15 @@ type FrameBuffer struct {
 	program          uint32
 	frameBufferTexID int32
 	vertAttrib       uint32
+	aspectUniform    int32
 	texCoordAttrib   uint32
+	useAspectRatio   bool
 }
 
-func NewFrameBuffer(width, height int32) *FrameBuffer {
-	fb := &FrameBuffer{}
+func NewFrameBuffer(width, height int32, useAspectRatio bool) *FrameBuffer {
+	fb := &FrameBuffer{
+		useAspectRatio: useAspectRatio,
+	}
 	gl.GenFramebuffers(1, &fb.FrameBuffer)
 	gl.BindFramebuffer(gl.FRAMEBUFFER, fb.FrameBuffer)
 	gl.GenTextures(1, &fb.texture)
@@ -64,6 +68,7 @@ func NewFrameBuffer(width, height int32) *FrameBuffer {
 	gl.UseProgram(fb.program)
 	fb.frameBufferTexID = gl.GetUniformLocation(fb.program, gl.Str("renderedTexture\x00"))
 	gl.BindFragDataLocation(fb.program, 0, gl.Str("outputColor\x00"))
+	fb.aspectUniform = gl.GetUniformLocation(fb.program, gl.Str("aspect\x00"))
 	fb.vertAttrib = uint32(gl.GetAttribLocation(fb.program, gl.Str("vert\x00")))
 	fb.texCoordAttrib = uint32(gl.GetAttribLocation(fb.program, gl.Str("vertTexCoord\x00")))
 	gl.GenVertexArrays(1, &fb.vao)
@@ -83,7 +88,7 @@ func (fb *FrameBuffer) Draw(windowWidth, windowHeight int) {
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
 	// window size
 	gl.Viewport(0, 0, int32(windowWidth), int32(windowHeight))
-	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+	// gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 	gl.Disable(gl.DEPTH_TEST)
 	gl.BindVertexArray(fb.vao)
 	gl.EnableVertexAttribArray(fb.vertAttrib)
@@ -95,17 +100,23 @@ func (fb *FrameBuffer) Draw(windowWidth, windowHeight int) {
 	gl.BindBuffer(gl.ARRAY_BUFFER, fb.vbo)
 	gl.VertexAttribPointer(fb.vertAttrib, 3, gl.FLOAT, false, 5*4, gl.PtrOffset(0))
 	gl.VertexAttribPointer(fb.texCoordAttrib, 2, gl.FLOAT, false, 5*4, gl.PtrOffset(3*4))
+	if fb.useAspectRatio {
+		gl.Uniform1f(fb.aspectUniform, float32(windowWidth)/float32(windowHeight))
+	} else {
+		gl.Uniform1f(fb.aspectUniform, 1)
+	}
 	gl.DrawArrays(gl.TRIANGLES, 0, 3*2*3)
 }
 
 var vertexShaderFb = `
 #version 330
+uniform float aspect;
 in vec3 vert;
 in vec2 vertTexCoord;
 out vec2 fragTexCoord;
 void main() {
     fragTexCoord = vertTexCoord;
-    gl_Position = vec4(vert, 1);
+    gl_Position = vec4(vert.x, vert.y * aspect, vert.z, 1);
 }
 ` + "\x00"
 
@@ -115,7 +126,14 @@ uniform sampler2D tex;
 in vec2 fragTexCoord;
 layout(location = 0) out vec4 outputColor;
 void main() {
+	// vec4 val = texture(tex, fragTexCoord);
+	// outputColor = val;
 	vec4 val = texture(tex, fragTexCoord);
-	outputColor = val;
+	if (val.a > 0.5) {
+		outputColor = val;
+	} else {
+		discard;
+	}
+	// outputColor = texture(tex, fragTexCoord);
 }
 ` + "\x00"
