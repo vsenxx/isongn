@@ -105,9 +105,6 @@ func appendShape(index int, name string, shapeDef map[string]interface{}, imageI
 	// size
 	sizeI := shapeDef["size"].([]interface{})
 	size := [3]float32{float32(sizeI[0].(float64)), float32(sizeI[1].(float64)), float32(sizeI[2].(float64))}
-	if _, ok := flagsSet["stamp"]; ok {
-		size[2] = 0.01
-	}
 
 	// pixel bounding box
 	posI := shapeDef["pos"].([]interface{})
@@ -172,7 +169,7 @@ func appendShape(index int, name string, shapeDef map[string]interface{}, imageI
 	}
 
 	// add a gap, if needed
-	for len(Shapes) < shape.Index-1 {
+	for len(Shapes) < shape.Index {
 		Shapes = append(Shapes, nil)
 	}
 	// add shape

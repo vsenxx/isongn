@@ -34,6 +34,7 @@ type BlockPos struct {
 }
 
 type View struct {
+	Loader             *world.Loader
 	projection, camera mgl32.Mat4
 	program            uint32
 	projectionUniform  int32
@@ -47,6 +48,7 @@ type View struct {
 	vao                uint32
 	blockPos           [SIZE][SIZE][world.SECTION_Z_SIZE]*BlockPos
 	edges              [SIZE][SIZE]*BlockPos
+	origins            [SIZE][SIZE][world.SECTION_Z_SIZE]*BlockPos
 	zoom               float64
 	shear              [3]float32
 	Cursor             *BlockPos
@@ -65,7 +67,7 @@ func getProjection(zoom float32, shear [3]float32) mgl32.Mat4 {
 	return projection
 }
 
-func InitView(zoom float64, camera, shear [3]float32) *View {
+func InitView(zoom float64, camera, shear [3]float32, loader *world.Loader) *View {
 	// does this have to be called in every file?
 	var err error
 	if err = gl.Init(); err != nil {
@@ -73,8 +75,9 @@ func InitView(zoom float64, camera, shear [3]float32) *View {
 	}
 
 	view := &View{
-		zoom:  zoom,
-		shear: shear,
+		zoom:   zoom,
+		shear:  shear,
+		Loader: loader,
 	}
 	view.projection = getProjection(float32(view.zoom), view.shear)
 
@@ -281,30 +284,122 @@ func (b *Block) vertices() []float32 {
 	return v
 }
 
-func (view *View) Load(loader *world.Loader) {
+func (view *View) Load() {
+	// reset
 	view.traverse(func(x, y, z int, blockPos *BlockPos, edge *BlockPos) {
-		// reset
 		blockPos.block = nil
-
-		worldX := loader.X - SIZE/2 + x
-		worldY := loader.Y - SIZE/2 + y
-		worldZ := z
-		shapeIndex, shapeX, shapeY, shapeZ, hasShape := loader.GetShape(worldX, worldY, worldZ)
-		if hasShape && worldX == shapeX && worldY == shapeY && worldZ == shapeZ {
-			blockPos.block = view.blocks[shapeIndex]
-			shape := shapes.Shapes[int(shapeIndex)]
-			blockPos.model.Set(0, 3, float32(x-SIZE/2)+shape.Offset[0])
-			blockPos.model.Set(1, 3, float32(y-SIZE/2)+shape.Offset[1])
-			blockPos.model.Set(2, 3, float32(z)+shape.Offset[2])
-		}
+		view.origins[x][y][z] = nil
 		if edge != nil {
 			edge.block = nil
-			shapeIndex, hasShape = loader.GetEdge(worldX, worldY)
-			if hasShape {
-				edge.block = view.blocks[shapeIndex]
-			}
 		}
 	})
+
+	// load
+	view.traverse(func(x, y, z int, blockPos *BlockPos, edge *BlockPos) {
+		worldX, worldY, worldZ := view.toWorldPos(x, y, z)
+		shapeIndex, hasShape := view.Loader.GetShape(worldX, worldY, worldZ)
+		if hasShape {
+			view.setShapeInner(worldX, worldY, worldZ, shapeIndex, true)
+		}
+		if edge != nil {
+			shapeIndex, hasShape = view.Loader.GetEdge(worldX, worldY)
+			view.setEdgeInner(worldX, worldY, shapeIndex, hasShape)
+		}
+	})
+}
+
+func (view *View) toWorldPos(viewX, viewY, viewZ int) (int, int, int) {
+	return viewX + (view.Loader.X - SIZE/2), viewY + (view.Loader.Y - SIZE/2), viewZ
+}
+
+func (view *View) toViewPos(worldX, worldY, worldZ int) (int, int, int, bool) {
+	viewX := worldX - (view.Loader.X - SIZE/2)
+	viewY := worldY - (view.Loader.Y - SIZE/2)
+	invalidPos := viewX < 0 || viewX >= SIZE || viewY < 0 || viewY >= SIZE || worldZ < 0 || worldZ >= world.SECTION_Z_SIZE
+	return viewX, viewY, worldZ, !invalidPos
+}
+
+func (view *View) InView(worldX, worldY, worldZ int) bool {
+	_, _, _, validPos := view.toViewPos(worldX, worldY, worldZ)
+	return validPos
+}
+
+func (view *View) GetShape(worldX, worldY, worldZ int) (int, int, int, int, bool) {
+	viewX, viewY, viewZ, validPos := view.toViewPos(worldX, worldY, worldZ)
+	if !validPos || view.origins[viewX][viewY][viewZ] == nil {
+		return 0, 0, 0, 0, false
+	}
+	b := view.origins[viewX][viewY][viewZ]
+	if b.block == nil {
+		wx, wy, wz := view.toWorldPos(viewX, viewY, viewZ)
+		fmt.Printf("\torigin points to nil block at: %d,%d,%d\n", wx, wy, wz)
+		return 0, 0, 0, 0, false
+	}
+	originWorldX, originWorldY, originWorldZ := view.toWorldPos(b.x, b.y, b.z)
+	return b.block.shape.Index, originWorldX, originWorldY, originWorldZ, true
+}
+
+func (view *View) SetShape(worldX, worldY, worldZ int, shapeIndex int) {
+	view.Loader.SetShape(worldX, worldY, worldZ, shapeIndex)
+	view.setShapeInner(worldX, worldY, worldZ, shapeIndex, true)
+}
+
+func (view *View) EraseShape(worldX, worldY, worldZ int) {
+	if shapeIndex, ox, oy, oz, hasShape := view.GetShape(worldX, worldY, worldZ); hasShape {
+		s := shapes.Shapes[shapeIndex]
+		fmt.Printf("Erasing %s at: %d,%d,%d size: %d,%d,%d\n", s.Name, ox, oy, oz, s.Size[0], s.Size[1], s.Size[2])
+		view.Loader.EraseShape(ox, oy, oz)
+		view.setShapeInner(ox, oy, oz, shapeIndex, false)
+	}
+}
+
+func (view *View) setShapeInner(worldX, worldY, worldZ int, shapeIndex int, hasShape bool) {
+	viewX, viewY, viewZ, validPos := view.toViewPos(worldX, worldY, worldZ)
+	if validPos {
+		blockPos := view.blockPos[viewX][viewY][viewZ]
+		shape := shapes.Shapes[shapeIndex]
+		if hasShape {
+			blockPos.block = view.blocks[shapeIndex]
+			blockPos.model.Set(0, 3, float32(viewX-SIZE/2)+shape.Offset[0])
+			blockPos.model.Set(1, 3, float32(viewY-SIZE/2)+shape.Offset[1])
+			blockPos.model.Set(2, 3, float32(viewZ)+shape.Offset[2])
+		} else {
+			blockPos.block = nil
+		}
+
+		shape.Traverse(func(shapeX, shapeY, shapeZ int) {
+			if viewX+shapeX < SIZE && viewY+shapeY < SIZE && viewZ+shapeZ < world.SECTION_Z_SIZE {
+				if hasShape {
+					view.origins[viewX+shapeX][viewY+shapeY][viewZ+shapeZ] = blockPos
+				} else {
+					wx, wy, wz := view.toWorldPos(viewX+shapeX, viewY+shapeY, viewZ+shapeZ)
+					fmt.Printf("\tsetting origin to nil at: %d,%d,%d\n", wx, wy, wz)
+					view.origins[viewX+shapeX][viewY+shapeY][viewZ+shapeZ] = nil
+				}
+			}
+		})
+	}
+}
+
+func (view *View) ClearEdge(worldX, worldY int) {
+	view.Loader.ClearEdge(worldX, worldY)
+	view.setEdgeInner(worldX, worldY, 0, false)
+}
+
+func (view *View) SetEdge(worldX, worldY int, shapeIndex int) {
+	view.Loader.SetEdge(worldX, worldY, shapeIndex)
+	view.setEdgeInner(worldX, worldY, shapeIndex, true)
+}
+
+func (view *View) setEdgeInner(worldX, worldY int, shapeIndex int, hasShape bool) {
+	viewX, viewY, _, validPos := view.toViewPos(worldX, worldY, 0)
+	if validPos {
+		if hasShape {
+			view.edges[viewX][viewY].block = view.blocks[shapeIndex]
+		} else {
+			view.edges[viewX][viewY].block = nil
+		}
+	}
 }
 
 func (view *View) traverse(fx func(x, y, z int, blockPos *BlockPos, edge *BlockPos)) {

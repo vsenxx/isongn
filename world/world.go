@@ -9,8 +9,6 @@ import (
 	"path/filepath"
 	"time"
 	"unsafe"
-
-	"github.com/uzudil/isongn/shapes"
 )
 
 const (
@@ -32,7 +30,6 @@ type Section struct {
 	X, Y     int
 	position [SECTION_SIZE][SECTION_SIZE][SECTION_Z_SIZE]Position
 	edges    [SECTION_SIZE][SECTION_SIZE]Position
-	origins  [SECTION_SIZE][SECTION_SIZE][SECTION_Z_SIZE]*Point
 }
 
 type SectionCache struct {
@@ -59,24 +56,26 @@ func NewLoader(dir string, x, y int, display Display) *Loader {
 	return &Loader{dir, x, y, NewSectionCache(), display}
 }
 
-func (loader *Loader) MoveTo(x, y int) {
+func (loader *Loader) MoveTo(x, y int) bool {
 	if x >= 0 && y >= 0 && (loader.X != x || loader.Y != y) {
 		loader.X = x
 		loader.Y = y
 		loader.display.Invalidate()
+		return true
 	}
+	return false
 }
 
 func (loader *Loader) ClearEdge(x, y int) {
 	section, atomX, atomY, _ := loader.getPosInSection(x, y, 0)
 	section.edges[atomX][atomY].Shape = 0
-	loader.display.Invalidate()
+	// loader.display.Invalidate()
 }
 
 func (loader *Loader) SetEdge(x, y int, shapeIndex int) {
 	section, atomX, atomY, _ := loader.getPosInSection(x, y, 0)
 	section.edges[atomX][atomY].Shape = shapeIndex + 1
-	loader.display.Invalidate()
+	// loader.display.Invalidate()
 }
 
 func (loader *Loader) GetEdge(x, y int) (int, bool) {
@@ -91,46 +90,28 @@ func (loader *Loader) GetEdge(x, y int) (int, bool) {
 func (loader *Loader) SetShape(x, y, z int, shapeIndex int) bool {
 	section, atomX, atomY, atomZ := loader.getPosInSection(x, y, z)
 	section.position[atomX][atomY][atomZ].Shape = shapeIndex + 1
-	// mark the shape's origin
-	shapes.Shapes[shapeIndex].Traverse(func(xx, yy, zz int) {
-		sec, ax, ay, az := loader.getPosInSection(x+xx, y+yy, z+zz)
-		sec.origins[ax][ay][az] = &Point{x, y, z}
-	})
-	loader.display.Invalidate()
+	// loader.display.Invalidate()
 	return true
 }
 
 func (loader *Loader) EraseShape(x, y, z int) bool {
 	section, atomX, atomY, atomZ := loader.getPosInSection(x, y, z)
-	if section.origins[atomX][atomY][atomZ] != nil {
-		o := section.origins[atomX][atomY][atomZ]
-		section, atomX, atomY, atomZ := loader.getPosInSection(o.x, o.y, o.z)
-		shapeIndex := section.position[atomX][atomY][atomZ].Shape
-		if shapeIndex > 0 {
-			shapes.Shapes[shapeIndex-1].Traverse(func(xx, yy, zz int) {
-				sec, ax, ay, az := loader.getPosInSection(x+xx, y+yy, z+zz)
-				sec.origins[ax][ay][az] = nil
-			})
-			section.position[atomX][atomY][atomZ].Shape = 0
-			loader.display.Invalidate()
-			return true
-		}
+	shapeIndex := section.position[atomX][atomY][atomZ].Shape
+	if shapeIndex > 0 {
+		section.position[atomX][atomY][atomZ].Shape = 0
+		// loader.display.Invalidate()
+		return true
 	}
 	return false
 }
 
-func (loader *Loader) GetShape(worldX, worldY, worldZ int) (int, int, int, int, bool) {
+func (loader *Loader) GetShape(worldX, worldY, worldZ int) (int, bool) {
 	section, atomX, atomY, atomZ := loader.getPosInSection(worldX, worldY, worldZ)
-	if section.origins[atomX][atomY][atomZ] != nil {
-		o := section.origins[atomX][atomY][atomZ]
-		section, atomX, atomY, atomZ := loader.getPosInSection(o.x, o.y, o.z)
-		shapeIndex := section.position[atomX][atomY][atomZ].Shape
-		if shapeIndex == 0 {
-			return 0, 0, 0, 0, false
-		}
-		return shapeIndex - 1, o.x, o.y, o.z, true
+	shapeIndex := section.position[atomX][atomY][atomZ].Shape
+	if shapeIndex == 0 {
+		return 0, false
 	}
-	return 0, 0, 0, 0, false
+	return shapeIndex - 1, true
 }
 
 func (loader *Loader) getPosInSection(worldX, worldY, worldZ int) (*Section, int, int, int) {
@@ -176,24 +157,6 @@ func (loader *Loader) getSection(sx, sy int) (*Section, error) {
 	// put in cache
 	loader.sectionCache.cache[oldestIndex] = section
 	loader.sectionCache.times[oldestIndex] = time.Now().Unix()
-
-	// expland shapes
-	startX := section.X * SECTION_SIZE
-	startY := section.Y * SECTION_SIZE
-	for x := 0; x < SECTION_SIZE; x++ {
-		for y := 0; y < SECTION_SIZE; y++ {
-			for z := 0; z < SECTION_Z_SIZE; z++ {
-				if section.position[x][y][z].Shape > 0 {
-					shapes.Shapes[section.position[x][y][z].Shape-1].Traverse(func(xx, yy, zz int) {
-						sec, ax, ay, az := loader.getPosInSection(startX+x+xx, startY+y+yy, z+zz)
-						if sec == section {
-							sec.origins[ax][ay][az] = &Point{startX + x, startY + y, z}
-						}
-					})
-				}
-			}
-		}
-	}
 
 	return section, nil
 }

@@ -119,7 +119,11 @@
             { "name": "fence.black.x", "size": [ 4, 1, 2], "pos": [456, 472] },
             { "name": "fence.black.y", "size": [ 1, 4, 2], "pos": [496, 472] },
             { "name": "candolabra.y", "size": [ 1, 2, 5], "pos": [544, 464] },
-            { "name": "candolabra.x", "size": [ 2, 1, 5], "pos": [568, 464] }
+            { "name": "candolabra.x", "size": [ 2, 1, 5], "pos": [568, 464] },
+            { "name": "hay.x", "size": [ 6, 2, 3], "pos": [264, 96] },
+            { "name": "chimney.y", "size": [ 1, 3, 10], "pos": [344, 88] },
+            { "name": "barrel.y", "size": [ 2, 3, 3], "pos": [384, 104] },
+            { "name": "bar.y", "size": [ 2, 5, 4], "pos": [432, 96] }
         ]
     },
     {

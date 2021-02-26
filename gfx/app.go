@@ -96,9 +96,9 @@ func NewApp(game Game, gameDir string, windowWidth, windowHeight int, targetFps 
 	if err != nil {
 		panic(err)
 	}
-	app.View = InitView(appConfig.zoom, appConfig.camera, appConfig.shear)
-	app.Ui = InitUi(width, height)
 	app.Loader = world.NewLoader(app.Dir, 1000, 1000, app)
+	app.View = InitView(appConfig.zoom, appConfig.camera, appConfig.shear, app.Loader)
+	app.Ui = InitUi(width, height)
 	return app
 }
 
@@ -283,7 +283,7 @@ func (app *App) Run() {
 
 		// redraw
 		if app.Reload {
-			app.View.Load(app.Loader)
+			app.View.Load()
 			app.Reload = false
 		}
 

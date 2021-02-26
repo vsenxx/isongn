@@ -1,6 +1,7 @@
 package editor
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
@@ -22,6 +23,8 @@ type Editor struct {
 	Z                   int
 	ctx                 *bscript.Context
 	command             *bscript.Command
+	lastX, lastY        int
+	updateCursor        bool
 }
 
 func NewEditor() *Editor {
@@ -87,6 +90,15 @@ func (e *Editor) isMoveKey() (int, int, bool) {
 }
 
 func (e *Editor) Events() {
+
+	if e.app.Loader.X != e.lastX || e.app.Loader.Y != e.lastY || e.updateCursor {
+		e.Z = e.findTop(e.app.Loader.X, e.app.Loader.Y)
+		e.app.View.SetCursor(e.shapeSelectorIndex, e.Z)
+		e.lastX = e.app.Loader.X
+		e.lastY = e.app.Loader.Y
+		e.updateCursor = false
+	}
+
 	if e.app.IsDownAlt1(glfw.KeyLeftBracket) && e.shapeSelectorIndex > 0 {
 		for i := e.shapeSelectorIndex - 1; i >= 0; i-- {
 			if shapes.Shapes[i] != nil && shapes.Shapes[i].EditorVisible {
@@ -107,26 +119,28 @@ func (e *Editor) Events() {
 	}
 
 	shape := shapes.Shapes[e.shapeSelectorIndex]
+	changed := false
 	dx, dy, insertMode := e.isMoveKey()
 	if insertMode {
 		dx *= int(shape.Size[0])
 		dy *= int(shape.Size[1])
 	}
-	e.app.Loader.MoveTo(e.app.Loader.X+dx, e.app.Loader.Y+dy)
 
 	f := e.app.IsFirstDown(glfw.KeySpace)
 	ff := e.app.IsDownMod(glfw.KeySpace, glfw.ModShift)
 	if insertMode || f || ff {
-		e.Z = e.findTop()
 		e.setShape(e.app.Loader.X, e.app.Loader.Y, e.Z, shapes.Shapes[e.shapeSelectorIndex], ff)
+		changed = true
 	}
 	if e.app.IsFirstDown(glfw.KeyE) && e.Z > 0 {
 		shapes.Shapes[e.shapeSelectorIndex].Traverse(func(xx, yy, zz int) {
 			if zz == 0 {
-				e.app.Loader.EraseShape(e.app.Loader.X+xx, e.app.Loader.Y+yy, e.Z-1)
+				e.app.View.EraseShape(e.app.Loader.X+xx, e.app.Loader.Y+yy, e.Z-1)
+				changed = true
 			}
 		})
 	}
+
 	if e.app.IsFirstDown(glfw.KeyX) {
 		e.app.Loader.SaveAll()
 	}
@@ -137,10 +151,11 @@ func (e *Editor) Events() {
 	// call bscript
 	e.command.Evaluate(e.ctx)
 
-	if e.shapeSelectorUpdate || e.app.Reload {
-		e.Z = e.findTop()
-		e.app.View.SetCursor(e.shapeSelectorIndex, e.Z)
-		e.app.Invalidate()
+	// move
+	e.app.Loader.MoveTo(e.app.Loader.X+dx, e.app.Loader.Y+dy)
+
+	if changed || e.shapeSelectorUpdate {
+		e.updateCursor = true
 	}
 }
 
@@ -151,25 +166,33 @@ func (e *Editor) GetZ() int {
 func (e *Editor) fill() {
 	shape := shapes.Shapes[e.shapeSelectorIndex]
 	if strings.HasPrefix(shape.Name, "ground.") {
-		shapeIndex, _, _, _, found := e.app.Loader.GetShape(e.app.Loader.X, e.app.Loader.Y, 0)
+		shapeIndex, _, _, _, found := e.app.View.GetShape(e.app.Loader.X, e.app.Loader.Y, 0)
 		var replaceShape *shapes.Shape
 		if found {
 			replaceShape = shapes.Shapes[shapeIndex]
 		}
-		e.fillAt(e.app.Loader.X, e.app.Loader.Y, shape, replaceShape)
+		e.fillAt(e.app.Loader.X, e.app.Loader.Y, shape, replaceShape, map[string]bool{})
 	}
 }
 
-func (e *Editor) fillAt(x, y int, shape, replaceShape *shapes.Shape) {
-	shapeIndex, _, _, _, found := e.app.Loader.GetShape(x, y, 0)
+func (e *Editor) fillAt(x, y int, shape, replaceShape *shapes.Shape, seen map[string]bool) {
+	if e.app.View.InView(x, y, 0) == false {
+		return
+	}
+	key := fmt.Sprintf("%d.%d", x, y)
+	if _, ok := seen[key]; ok {
+		return
+	}
+	seen[key] = true
+	shapeIndex, _, _, _, found := e.app.View.GetShape(x, y, 0)
 	if (replaceShape == nil && found == false) || (replaceShape != nil && int(shapeIndex) == replaceShape.Index) {
 		e.setShape(x, y, 0, shape, false)
 		w := int(shape.Size[0])
 		h := int(shape.Size[1])
-		e.fillAt(x-w, y, shape, replaceShape)
-		e.fillAt(x+w, y, shape, replaceShape)
-		e.fillAt(x, y-h, shape, replaceShape)
-		e.fillAt(x, y+h, shape, replaceShape)
+		e.fillAt(x-w, y, shape, replaceShape, seen)
+		e.fillAt(x+w, y, shape, replaceShape, seen)
+		e.fillAt(x, y-h, shape, replaceShape, seen)
+		e.fillAt(x, y+h, shape, replaceShape, seen)
 	}
 }
 
@@ -181,19 +204,19 @@ func (e *Editor) setShape(x, y, z int, shape *shapes.Shape, skipEdge bool) {
 		y = (y / h) * h
 		z = 0
 	}
-	e.app.Loader.SetShape(x, y, z, e.shapeSelectorIndex)
+	e.app.View.SetShape(x, y, z, e.shapeSelectorIndex)
 
 	if skipEdge {
-		e.app.Loader.ClearEdge(x, y)
+		e.app.View.ClearEdge(x, y)
 	} else {
 		if z == 0 {
 			for xx := -1; xx <= 1; xx++ {
 				for yy := -1; yy <= 1; yy++ {
 					sx := x + xx*int(shape.Size[0])
 					sy := y + yy*int(shape.Size[1])
-					shapeIndex, _, _, _, found := e.app.Loader.GetShape(sx, sy, z)
+					shapeIndex, ox, oy, _, found := e.app.View.GetShape(sx, sy, z)
 					if found {
-						e.setEdges(sx, sy, shapes.Shapes[shapeIndex])
+						e.setEdges(ox, oy, shapes.Shapes[shapeIndex])
 					}
 				}
 			}
@@ -202,7 +225,7 @@ func (e *Editor) setShape(x, y, z int, shape *shapes.Shape, skipEdge bool) {
 }
 
 func (e *Editor) setEdges(x, y int, shape *shapes.Shape) {
-	e.app.Loader.ClearEdge(x, y)
+	e.app.View.ClearEdge(x, y)
 
 	w := int(shape.Size[0])
 	h := int(shape.Size[1])
@@ -264,13 +287,13 @@ func (e *Editor) setEdges(x, y int, shape *shapes.Shape) {
 	if edgeName != "" && edgeShape.Index != shape.Index {
 		edge := edgeShape.GetEdge(shape.Name, edgeName)
 		if edge != nil {
-			e.app.Loader.SetEdge(x, y, edge.Index)
+			e.app.View.SetEdge(x, y, edge.Index)
 		}
 	}
 }
 
 func (e *Editor) getEdgeShape(x, y int, target *shapes.Shape) *shapes.Shape {
-	shapeIndex, _, _, _, found := e.app.Loader.GetShape(x, y, 0)
+	shapeIndex, _, _, _, found := e.app.View.GetShape(x, y, 0)
 	if found == false {
 		return nil
 	}
@@ -281,25 +304,20 @@ func (e *Editor) getEdgeShape(x, y int, target *shapes.Shape) *shapes.Shape {
 	return nil
 }
 
-func (e *Editor) findTop() int {
-	lastZ := e.Z
+func (e *Editor) findTop(worldX, worldY int) int {
+	maxZ := 0
 	shape := shapes.Shapes[e.shapeSelectorIndex]
 	for x := 0; x < int(shape.Size[0]); x++ {
 		for y := 0; y < int(shape.Size[1]); y++ {
 			for z := world.SECTION_Z_SIZE - 1; z >= 0; z-- {
-				shapeIndex, _, _, _, found := e.app.Loader.GetShape(e.app.Loader.X+x, e.app.Loader.Y+y, z)
-				if found {
-					shape := shapes.Shapes[shapeIndex]
-					if shape.Size[2] == 0 {
-						return z
-					}
-					return lastZ
+				_, _, _, _, found := e.app.View.GetShape(worldX+x, worldY+y, z)
+				if found && z+1 > maxZ {
+					maxZ = z + 1
 				}
-				lastZ = z
 			}
 		}
 	}
-	return 0
+	return maxZ
 }
 
 func (e *Editor) shapeSelectorContents(panel *gfx.Panel) bool {
