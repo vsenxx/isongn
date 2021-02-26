@@ -332,7 +332,7 @@ func (view *View) GetShape(worldX, worldY, worldZ int) (int, int, int, int, bool
 	b := view.origins[viewX][viewY][viewZ]
 	if b.block == nil {
 		wx, wy, wz := view.toWorldPos(viewX, viewY, viewZ)
-		fmt.Printf("\torigin points to nil block at: %d,%d,%d\n", wx, wy, wz)
+		fmt.Printf("Error: origin points to nil block at: %d,%d,%d\n", wx, wy, wz)
 		return 0, 0, 0, 0, false
 	}
 	originWorldX, originWorldY, originWorldZ := view.toWorldPos(b.x, b.y, b.z)
@@ -346,8 +346,6 @@ func (view *View) SetShape(worldX, worldY, worldZ int, shapeIndex int) {
 
 func (view *View) EraseShape(worldX, worldY, worldZ int) {
 	if shapeIndex, ox, oy, oz, hasShape := view.GetShape(worldX, worldY, worldZ); hasShape {
-		s := shapes.Shapes[shapeIndex]
-		fmt.Printf("Erasing %s at: %d,%d,%d size: %d,%d,%d\n", s.Name, ox, oy, oz, s.Size[0], s.Size[1], s.Size[2])
 		view.Loader.EraseShape(ox, oy, oz)
 		view.setShapeInner(ox, oy, oz, shapeIndex, false)
 	}
@@ -372,8 +370,6 @@ func (view *View) setShapeInner(worldX, worldY, worldZ int, shapeIndex int, hasS
 				if hasShape {
 					view.origins[viewX+shapeX][viewY+shapeY][viewZ+shapeZ] = blockPos
 				} else {
-					wx, wy, wz := view.toWorldPos(viewX+shapeX, viewY+shapeY, viewZ+shapeZ)
-					fmt.Printf("\tsetting origin to nil at: %d,%d,%d\n", wx, wy, wz)
 					view.origins[viewX+shapeX][viewY+shapeY][viewZ+shapeZ] = nil
 				}
 			}
