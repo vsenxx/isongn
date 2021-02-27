@@ -36,6 +36,7 @@ type AppConfig struct {
 	Title      string
 	Name       string
 	Version    float64
+	Font       string
 	ViewSize   int
 	ViewSizeZ  int
 	SectorSize int
@@ -47,6 +48,7 @@ type AppConfig struct {
 
 type App struct {
 	Game                            Game
+	Font                            *Font
 	Config                          *AppConfig
 	Window                          *glfw.Window
 	KeyState                        map[glfw.Key]*KeyPress
@@ -79,6 +81,11 @@ func NewApp(game Game, gameDir string, windowWidth, windowHeight int, targetFps 
 		windowHeight: windowHeight,
 		Reload:       true,
 	}
+	font, err := NewFont(filepath.Join(gameDir, appConfig.Font), 32)
+	if err != nil {
+		panic(err)
+	}
+	app.Font = font
 	app.Dir = initUserdir(appConfig.Name)
 	app.Window = initWindow(windowWidth, windowHeight)
 	pxWidth, pxHeight := app.Window.GetFramebufferSize()
@@ -92,7 +99,7 @@ func NewApp(game Game, gameDir string, windowWidth, windowHeight int, targetFps 
 	app.frameBuffer = NewFrameBuffer(int32(width), int32(height), true)
 	app.uiFrameBuffer = NewFrameBuffer(int32(width), int32(height), false)
 	InitScript()
-	err := shapes.InitShapes(gameDir)
+	err = shapes.InitShapes(gameDir)
 	if err != nil {
 		panic(err)
 	}
@@ -125,6 +132,7 @@ func parseConfig(gameDir string) *AppConfig {
 		Title:      data["title"].(string),
 		Name:       strings.ToLower(data["name"].(string)),
 		Version:    data["version"].(float64),
+		Font:       data["font"].(string),
 		ViewSize:   int(view["size"].(float64)),
 		ViewSizeZ:  int(view["sizeZ"].(float64)),
 		SectorSize: int(view["sector"].(float64)),

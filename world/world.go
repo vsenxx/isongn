@@ -114,6 +114,12 @@ func (loader *Loader) GetShape(worldX, worldY, worldZ int) (int, bool) {
 	return shapeIndex - 1, true
 }
 
+func (loader *Loader) GetSectionPos() (int, int) {
+	sx := loader.X / SECTION_SIZE
+	sy := loader.Y / SECTION_SIZE
+	return sx, sy
+}
+
 func (loader *Loader) getPosInSection(worldX, worldY, worldZ int) (*Section, int, int, int) {
 	sx := worldX / SECTION_SIZE
 	sy := worldY / SECTION_SIZE

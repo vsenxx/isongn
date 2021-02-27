@@ -2,6 +2,7 @@
     "title": "Escape from Enilar",
     "name": "enilar",
     "version": 0.1,
+    "font": "rudelsberg/Rudelsberg.ttf",
     "runtime": {
         "editor": {
             "resolution": [ 1024, 768 ]

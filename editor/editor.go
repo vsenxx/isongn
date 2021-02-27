@@ -20,6 +20,7 @@ type Editor struct {
 	app                 *gfx.App
 	shapeSelectorIndex  int
 	shapeSelectorUpdate bool
+	infoUpdate          bool
 	Z                   int
 	ctx                 *bscript.Context
 	command             *bscript.Command
@@ -30,6 +31,7 @@ type Editor struct {
 func NewEditor() *Editor {
 	return &Editor{
 		shapeSelectorUpdate: true,
+		infoUpdate:          true,
 	}
 }
 
@@ -59,6 +61,7 @@ func (e *Editor) Init(app *gfx.App) {
 
 	// add a ui
 	e.app.Ui.Add(int(e.app.Width)-150, 0, 150, int(e.app.Height), e.shapeSelectorContents)
+	e.app.Ui.Add(0, 0, int(e.app.Width)-150, 50, e.infoContents)
 }
 
 func (e *Editor) Name() string {
@@ -152,7 +155,9 @@ func (e *Editor) Events() {
 	e.command.Evaluate(e.ctx)
 
 	// move
-	e.app.Loader.MoveTo(e.app.Loader.X+dx, e.app.Loader.Y+dy)
+	if e.app.Loader.MoveTo(e.app.Loader.X+dx, e.app.Loader.Y+dy) {
+		e.infoUpdate = true
+	}
 
 	if changed || e.shapeSelectorUpdate {
 		e.updateCursor = true
@@ -318,6 +323,17 @@ func (e *Editor) findTop(worldX, worldY int) int {
 		}
 	}
 	return maxZ
+}
+
+func (e *Editor) infoContents(panel *gfx.Panel) bool {
+	if e.infoUpdate {
+		panel.Clear()
+		sx, sy := e.app.Loader.GetSectionPos()
+		e.app.Font.Printf(panel.Rgba, color.Black, 0, 30, "pos=%d,%d section=%02x%02x", e.app.Loader.X, e.app.Loader.Y, sx, sy)
+		e.infoUpdate = false
+		return true
+	}
+	return false
 }
 
 func (e *Editor) shapeSelectorContents(panel *gfx.Panel) bool {
