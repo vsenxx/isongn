@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/uzudil/bscript/bscript"
-	"github.com/uzudil/isongn/world"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
 	"github.com/uzudil/isongn/gfx"
@@ -37,6 +36,7 @@ func NewEditor() *Editor {
 
 func (e *Editor) Init(app *gfx.App) {
 	e.app = app
+	e.app.View.Load()
 
 	// compile the editor script code
 	_, ctx, err := bscript.Build(
@@ -156,6 +156,7 @@ func (e *Editor) Events() {
 
 	// move
 	if e.app.Loader.MoveTo(e.app.Loader.X+dx, e.app.Loader.Y+dy) {
+		e.app.View.Load()
 		e.infoUpdate = true
 	}
 
@@ -310,26 +311,14 @@ func (e *Editor) getEdgeShape(x, y int, target *shapes.Shape) *shapes.Shape {
 }
 
 func (e *Editor) findTop(worldX, worldY int) int {
-	maxZ := 0
-	shape := shapes.Shapes[e.shapeSelectorIndex]
-	for x := 0; x < int(shape.Size[0]); x++ {
-		for y := 0; y < int(shape.Size[1]); y++ {
-			for z := world.SECTION_Z_SIZE - 1; z >= 0; z-- {
-				_, _, _, _, found := e.app.View.GetShape(worldX+x, worldY+y, z)
-				if found && z+1 > maxZ {
-					maxZ = z + 1
-				}
-			}
-		}
-	}
-	return maxZ
+	return e.app.View.FindTop(worldX, worldY, shapes.Shapes[e.shapeSelectorIndex])
 }
 
 func (e *Editor) infoContents(panel *gfx.Panel) bool {
 	if e.infoUpdate {
 		panel.Clear()
 		sx, sy := e.app.Loader.GetSectionPos()
-		e.app.Font.Printf(panel.Rgba, color.Black, 0, 30, "pos=%d,%d section=%02x%02x", e.app.Loader.X, e.app.Loader.Y, sx, sy)
+		e.app.Font.Printf(panel.Rgba, color.Black, 0, 30, "pos=%d,%d,%d section=%02x%02x", e.app.Loader.X, e.app.Loader.Y, e.Z, sx, sy)
 		e.infoUpdate = false
 		return true
 	}

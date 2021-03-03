@@ -1,10 +1,8 @@
 package shapes
 
 import (
-	"encoding/json"
 	"fmt"
 	"image"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -26,40 +24,39 @@ type ShapeMeta struct {
 	UnitPixels    [2]int
 }
 
+type TextureCoords struct {
+	PixelOffset [2]float32
+	PixelDim    [2]float32
+	TexOffset   [2]float32
+	TexDim      [2]float32
+}
+
+type Animation struct {
+	Name  string
+	Steps int
+	Tex   map[string][]*TextureCoords
+}
+
 type Shape struct {
 	Index         int
 	Name          string
 	Image         *image.RGBA
 	Size          [3]float32
-	PixelOffset   [2]float32
-	PixelDim      [2]float32
-	TexOffset     [2]float32
-	TexDim        [2]float32
+	Tex           *TextureCoords
 	Fudge         float32
 	ImageIndex    int
 	ShapeMeta     *ShapeMeta
-	Flags         map[string]bool
 	Edges         map[string]map[string][]*Shape
 	Offset        [3]float32
 	EditorVisible bool
+	Animations    map[string]*Animation
 }
 
 var Shapes []*Shape
 var Names map[string]int = map[string]int{}
 var Images []image.Image
 
-func InitShapes(gameDir string) error {
-	bytes, err := ioutil.ReadFile(filepath.Join(gameDir, "shapes.json"))
-	if err != nil {
-		// return nil not error: file missing is not an error
-		return err
-	}
-	data := []map[string]interface{}{}
-	err = json.Unmarshal(bytes, &data)
-	if err != nil {
-		return err
-	}
-
+func InitShapes(gameDir string, data []map[string]interface{}) error {
 	for _, block := range data {
 		imgFile := block["image"].(string)
 		shapes := block["shapes"].([]interface{})
@@ -93,15 +90,6 @@ func InitShapes(gameDir string) error {
 }
 
 func appendShape(index int, name string, shapeDef map[string]interface{}, imageIndex int, img image.Image, shapeMeta *ShapeMeta) {
-	// flags
-	flagsSet := map[string]bool{}
-	flags, ok := shapeDef["flags"]
-	if ok {
-		for _, flag := range flags.([]interface{}) {
-			flagsSet[flag.(string)] = true
-		}
-	}
-
 	// size
 	sizeI := shapeDef["size"].([]interface{})
 	size := [3]float32{float32(sizeI[0].(float64)), float32(sizeI[1].(float64)), float32(sizeI[2].(float64))}
@@ -139,7 +127,6 @@ func appendShape(index int, name string, shapeDef map[string]interface{}, imageI
 		fudge,
 		imageIndex,
 		shapeMeta,
-		flagsSet,
 		offset,
 	)
 
@@ -213,22 +200,17 @@ func findShape(name string) *Shape {
 	panic("Can't find shape: " + name)
 }
 
-func newShape(index int, name string, size [3]float32, px, py, pw, ph float32, img image.Image, fudge float32, imageIndex int, shapeMeta *ShapeMeta, flagsSet map[string]bool, offset [3]float32) *Shape {
-	imageBounds := img.Bounds()
+func newShape(index int, name string, size [3]float32, px, py, pw, ph float32, img image.Image, fudge float32, imageIndex int, shapeMeta *ShapeMeta, offset [3]float32) *Shape {
 	shape := &Shape{
-		Index:       index,
-		Name:        name,
-		Size:        size,
-		PixelOffset: [2]float32{px, py},
-		PixelDim:    [2]float32{pw, ph},
-		TexOffset:   [2]float32{float32(px) / float32(imageBounds.Max.X), float32(py) / float32(imageBounds.Max.Y)},
-		TexDim:      [2]float32{float32(pw) / float32(imageBounds.Max.X), float32(ph) / float32(imageBounds.Max.Y)},
-		Fudge:       fudge,
-		ImageIndex:  imageIndex,
-		ShapeMeta:   shapeMeta,
-		Flags:       flagsSet,
-		Edges:       map[string]map[string][]*Shape{},
-		Offset:      offset,
+		Index:      index,
+		Name:       name,
+		Size:       size,
+		Tex:        NewTextureCoords(img.Bounds(), px, py, pw, ph),
+		Fudge:      fudge,
+		ImageIndex: imageIndex,
+		ShapeMeta:  shapeMeta,
+		Edges:      map[string]map[string][]*Shape{},
+		Offset:     offset,
 	}
 
 	// create a half-size thumbnail
@@ -241,6 +223,82 @@ func newShape(index int, name string, size [3]float32, px, py, pw, ph float32, i
 	draw.Draw(shape.Image, resized.Bounds(), resized, image.ZP, draw.Src)
 
 	return shape
+}
+
+func NewTextureCoords(imageBounds image.Rectangle, px, py, pw, ph float32) *TextureCoords {
+	return &TextureCoords{
+		PixelOffset: [2]float32{px, py},
+		PixelDim:    [2]float32{pw, ph},
+		TexOffset:   [2]float32{float32(px) / float32(imageBounds.Max.X), float32(py) / float32(imageBounds.Max.Y)},
+		TexDim:      [2]float32{float32(pw) / float32(imageBounds.Max.X), float32(ph) / float32(imageBounds.Max.Y)},
+	}
+}
+
+func InitCreatures(gameDir string, data []map[string]interface{}) error {
+	// create a large image to store all the animated textures
+	for _, block := range data {
+		name := block["name"].(string)
+		fmt.Printf("\tProcessing creature: %s\n", name)
+		img, err := loadImage(filepath.Join(gameDir, "creatures", fmt.Sprintf("%s.png", name)))
+		if err != nil {
+			return err
+		}
+		imageIndex := len(Images)
+		Images = append(Images, img)
+
+		sizeI := block["size"].([]interface{})
+		size := [3]float32{float32(sizeI[0].(float64)), float32(sizeI[1].(float64)), float32(sizeI[2].(float64))}
+
+		shape := &Shape{
+			Index:      imageIndex * 0x100,
+			Name:       name,
+			Size:       size,
+			ImageIndex: imageIndex,
+			Animations: map[string]*Animation{},
+		}
+
+		// add a gap, if needed
+		for len(Shapes) < shape.Index {
+			Shapes = append(Shapes, nil)
+		}
+		Shapes = append(Shapes, shape)
+		Names[name] = shape.Index
+
+		dimI := block["dim"].([]interface{})
+		dim := [2]int{int(dimI[0].(float64)), int(dimI[1].(float64))}
+
+		frames := block["frames"].([]interface{})
+		xpos := 0
+		for _, frameBlock := range frames {
+			frame := frameBlock.(map[string]interface{})
+			a := &Animation{
+				Name:  frame["name"].(string),
+				Steps: int(frame["steps"].(float64)),
+				Tex:   map[string][]*TextureCoords{},
+			}
+			dirs := frame["dirs"].([]interface{})
+			for _, dirI := range dirs {
+				dirFrames := []*TextureCoords{}
+				for step := 0; step < a.Steps; step++ {
+					dirFrames = append(dirFrames, NewTextureCoords(
+						img.Bounds(),
+						float32(xpos), 0,
+						float32(dim[0]), float32(dim[1]),
+					))
+					if shape.Tex == nil {
+						shape.Tex = dirFrames[0]
+					}
+					xpos += dim[0]
+				}
+				fmt.Printf("\t\t\tadding %d steps for: %s\n", a.Steps, dirI.(string))
+				a.Tex[dirI.(string)] = dirFrames
+			}
+			frameName := frame["name"].(string)
+			fmt.Printf("\t\tadding animations for: %s\n", frameName)
+			shape.Animations[frameName] = a
+		}
+	}
+	return nil
 }
 
 func loadImage(path string) (image.Image, error) {

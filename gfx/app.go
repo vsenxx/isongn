@@ -44,6 +44,8 @@ type AppConfig struct {
 	zoom       float64
 	camera     [3]float32
 	shear      [3]float32
+	shapes     []map[string]interface{}
+	creatures  []map[string]interface{}
 }
 
 type App struct {
@@ -64,7 +66,6 @@ type App struct {
 	windowWidthDpi, windowHeightDpi int
 	dpiX, dpiY                      float32
 	frameBuffer, uiFrameBuffer      *FrameBuffer
-	Reload                          bool
 }
 
 func NewApp(game Game, gameDir string, windowWidth, windowHeight int, targetFps float64) *App {
@@ -79,7 +80,6 @@ func NewApp(game Game, gameDir string, windowWidth, windowHeight int, targetFps 
 		Height:       height,
 		windowWidth:  windowWidth,
 		windowHeight: windowHeight,
-		Reload:       true,
 	}
 	font, err := NewFont(filepath.Join(gameDir, appConfig.Font), 32)
 	if err != nil {
@@ -99,18 +99,18 @@ func NewApp(game Game, gameDir string, windowWidth, windowHeight int, targetFps 
 	app.frameBuffer = NewFrameBuffer(int32(width), int32(height), true)
 	app.uiFrameBuffer = NewFrameBuffer(int32(width), int32(height), false)
 	InitScript()
-	err = shapes.InitShapes(gameDir)
+	err = shapes.InitShapes(gameDir, appConfig.shapes)
 	if err != nil {
 		panic(err)
 	}
-	app.Loader = world.NewLoader(app.Dir, 1000, 1000, app)
+	err = shapes.InitCreatures(gameDir, appConfig.creatures)
+	if err != nil {
+		panic(err)
+	}
+	app.Loader = world.NewLoader(app.Dir, 1000, 1000)
 	app.View = InitView(appConfig.zoom, appConfig.camera, appConfig.shear, app.Loader)
 	app.Ui = InitUi(width, height)
 	return app
-}
-
-func (app *App) Invalidate() {
-	app.Reload = true
 }
 
 func parseConfig(gameDir string) *AppConfig {
@@ -140,9 +140,19 @@ func parseConfig(gameDir string) *AppConfig {
 		zoom:       view["zoom"].(float64),
 		camera:     [3]float32{float32(camera[0].(float64)), float32(camera[1].(float64)), float32(camera[2].(float64))},
 		shear:      [3]float32{float32(shear[0].(float64)), float32(shear[1].(float64)), float32(shear[2].(float64))},
+		shapes:     toMap(data["shapes"].([]interface{})),
+		creatures:  toMap(data["creatures"].([]interface{})),
 	}
 	fmt.Printf("Starting game: %s (v%f)\n", config.Title, config.Version)
 	return config
+}
+
+func toMap(a []interface{}) []map[string]interface{} {
+	r := []map[string]interface{}{}
+	for _, o := range a {
+		r = append(r, o.(map[string]interface{}))
+	}
+	return r
 }
 
 func getResolution(appConfig *AppConfig, mode string) (int, int) {
@@ -288,12 +298,6 @@ func (app *App) Run() {
 
 		// handle events
 		app.Game.Events()
-
-		// redraw
-		if app.Reload {
-			app.View.Load()
-			app.Reload = false
-		}
 
 		app.frameBuffer.Enable(app.Width, app.Height)
 		app.View.Draw()

@@ -7,6 +7,7 @@ import (
 	"math"
 
 	"github.com/go-gl/gl/all-core/gl"
+	"github.com/go-gl/glfw/v3.3/glfw"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/uzudil/isongn/shapes"
 	"github.com/uzudil/isongn/world"
@@ -28,30 +29,34 @@ type Block struct {
 
 // BlockPos is a displayed Shape at a location
 type BlockPos struct {
-	model   mgl32.Mat4
-	x, y, z int
-	block   *Block
+	model          mgl32.Mat4
+	x, y, z        int
+	block          *Block
+	dir            *shapes.Direction
+	animationTimer float64
+	animationStep  int
 }
 
 type View struct {
-	Loader             *world.Loader
-	projection, camera mgl32.Mat4
-	program            uint32
-	projectionUniform  int32
-	cameraUniform      int32
-	modelUniform       int32
-	textureUniform     int32
-	vertAttrib         uint32
-	texCoordAttrib     uint32
-	textures           map[int]*Texture
-	blocks             []*Block
-	vao                uint32
-	blockPos           [SIZE][SIZE][world.SECTION_Z_SIZE]*BlockPos
-	edges              [SIZE][SIZE]*BlockPos
-	origins            [SIZE][SIZE][world.SECTION_Z_SIZE]*BlockPos
-	zoom               float64
-	shear              [3]float32
-	Cursor             *BlockPos
+	Loader               *world.Loader
+	projection, camera   mgl32.Mat4
+	program              uint32
+	projectionUniform    int32
+	cameraUniform        int32
+	modelUniform         int32
+	textureUniform       int32
+	textureOffsetUniform int32
+	vertAttrib           uint32
+	texCoordAttrib       uint32
+	textures             map[int]*Texture
+	blocks               []*Block
+	vao                  uint32
+	blockPos             [SIZE][SIZE][world.SECTION_Z_SIZE]*BlockPos
+	edges                [SIZE][SIZE]*BlockPos
+	origins              [SIZE][SIZE][world.SECTION_Z_SIZE]*BlockPos
+	zoom                 float64
+	shear                [3]float32
+	Cursor               *BlockPos
 }
 
 const viewSize = 10
@@ -95,6 +100,7 @@ func InitView(zoom float64, camera, shear [3]float32, loader *world.Loader) *Vie
 	view.cameraUniform = gl.GetUniformLocation(view.program, gl.Str("camera\x00"))
 	view.modelUniform = gl.GetUniformLocation(view.program, gl.Str("model\x00"))
 	view.textureUniform = gl.GetUniformLocation(view.program, gl.Str("tex\x00"))
+	view.textureOffsetUniform = gl.GetUniformLocation(view.program, gl.Str("textureOffset\x00"))
 	gl.BindFragDataLocation(view.program, 0, gl.Str("outputColor\x00"))
 	view.vertAttrib = uint32(gl.GetAttribLocation(view.program, gl.Str("vert\x00")))
 	view.texCoordAttrib = uint32(gl.GetAttribLocation(view.program, gl.Str("vertTexCoord\x00")))
@@ -262,11 +268,11 @@ func (b *Block) vertices() []float32 {
 
 	// scale and translate tex coords to within larger texture
 	for i := 0; i < 7; i++ {
-		points[i*5+3] *= b.shape.TexDim[0]
-		points[i*5+3] += b.shape.TexOffset[0]
+		points[i*5+3] *= b.shape.Tex.TexDim[0]
+		points[i*5+3] += b.shape.Tex.TexOffset[0]
 
-		points[i*5+4] *= b.shape.TexDim[1]
-		points[i*5+4] += b.shape.TexOffset[1]
+		points[i*5+4] *= b.shape.Tex.TexDim[1]
+		points[i*5+4] += b.shape.Tex.TexOffset[1]
 	}
 
 	left := []int{0, 1, 2, 0, 2, 6}
@@ -286,22 +292,25 @@ func (b *Block) vertices() []float32 {
 
 func (view *View) Load() {
 	// reset
-	view.traverse(func(x, y, z int, blockPos *BlockPos, edge *BlockPos) {
+	view.traverse(func(x, y, z int) {
+		blockPos := view.blockPos[x][y][z]
 		blockPos.block = nil
 		view.origins[x][y][z] = nil
-		if edge != nil {
+
+		if z == 0 {
+			edge := view.edges[x][y]
 			edge.block = nil
 		}
 	})
 
 	// load
-	view.traverse(func(x, y, z int, blockPos *BlockPos, edge *BlockPos) {
+	view.traverse(func(x, y, z int) {
 		worldX, worldY, worldZ := view.toWorldPos(x, y, z)
 		shapeIndex, hasShape := view.Loader.GetShape(worldX, worldY, worldZ)
 		if hasShape {
-			view.setShapeInner(worldX, worldY, worldZ, shapeIndex, true)
+			view.setShapeInner(worldX, worldY, worldZ, shapeIndex, true, nil)
 		}
-		if edge != nil {
+		if z == 0 {
 			shapeIndex, hasShape = view.Loader.GetEdge(worldX, worldY)
 			view.setEdgeInner(worldX, worldY, shapeIndex, hasShape)
 		}
@@ -339,19 +348,38 @@ func (view *View) GetShape(worldX, worldY, worldZ int) (int, int, int, int, bool
 	return b.block.shape.Index, originWorldX, originWorldY, originWorldZ, true
 }
 
-func (view *View) SetShape(worldX, worldY, worldZ int, shapeIndex int) {
+func (view *View) FindTop(worldX, worldY int, shape *shapes.Shape) int {
+	maxZ := 0
+	for x := 0; x < int(shape.Size[0]); x++ {
+		for y := 0; y < int(shape.Size[1]); y++ {
+			for z := world.SECTION_Z_SIZE - 1; z >= 0; z-- {
+				_, _, _, _, found := view.GetShape(worldX+x, worldY+y, z)
+				if found && z+1 > maxZ {
+					maxZ = z + 1
+				}
+			}
+		}
+	}
+	return maxZ
+}
+
+func (view *View) SetShapeDir(worldX, worldY, worldZ int, shapeIndex int, dir *shapes.Direction) {
 	view.Loader.SetShape(worldX, worldY, worldZ, shapeIndex)
-	view.setShapeInner(worldX, worldY, worldZ, shapeIndex, true)
+	view.setShapeInner(worldX, worldY, worldZ, shapeIndex, true, dir)
+}
+
+func (view *View) SetShape(worldX, worldY, worldZ int, shapeIndex int) {
+	view.SetShapeDir(worldX, worldY, worldZ, shapeIndex, nil)
 }
 
 func (view *View) EraseShape(worldX, worldY, worldZ int) {
 	if shapeIndex, ox, oy, oz, hasShape := view.GetShape(worldX, worldY, worldZ); hasShape {
 		view.Loader.EraseShape(ox, oy, oz)
-		view.setShapeInner(ox, oy, oz, shapeIndex, false)
+		view.setShapeInner(ox, oy, oz, shapeIndex, false, nil)
 	}
 }
 
-func (view *View) setShapeInner(worldX, worldY, worldZ int, shapeIndex int, hasShape bool) {
+func (view *View) setShapeInner(worldX, worldY, worldZ int, shapeIndex int, hasShape bool, dir *shapes.Direction) {
 	viewX, viewY, viewZ, validPos := view.toViewPos(worldX, worldY, worldZ)
 	if validPos {
 		blockPos := view.blockPos[viewX][viewY][viewZ]
@@ -361,6 +389,7 @@ func (view *View) setShapeInner(worldX, worldY, worldZ int, shapeIndex int, hasS
 			blockPos.model.Set(0, 3, float32(viewX-SIZE/2)+shape.Offset[0])
 			blockPos.model.Set(1, 3, float32(viewY-SIZE/2)+shape.Offset[1])
 			blockPos.model.Set(2, 3, float32(viewZ)+shape.Offset[2])
+			blockPos.dir = dir
 		} else {
 			blockPos.block = nil
 		}
@@ -398,16 +427,11 @@ func (view *View) setEdgeInner(worldX, worldY int, shapeIndex int, hasShape bool
 	}
 }
 
-func (view *View) traverse(fx func(x, y, z int, blockPos *BlockPos, edge *BlockPos)) {
+func (view *View) traverse(fx func(x, y, z int)) {
 	for x := 0; x < SIZE; x++ {
 		for y := 0; y < SIZE; y++ {
 			for z := 0; z < world.SECTION_Z_SIZE; z++ {
-				blockPos := view.blockPos[x][y][z]
-				var edge *BlockPos
-				if z == 0 {
-					edge = view.edges[x][y]
-				}
-				fx(x, y, z, blockPos, edge)
+				fx(x, y, z)
 			}
 		}
 	}
@@ -441,12 +465,17 @@ func (view *View) Draw() {
 	gl.EnableVertexAttribArray(view.vertAttrib)
 	gl.EnableVertexAttribArray(view.texCoordAttrib)
 	state := DrawState{}
-	view.traverse(func(x, y, z int, blockPos *BlockPos, edge *BlockPos) {
+	view.traverse(func(x, y, z int) {
+		blockPos := view.blockPos[x][y][z]
 		if blockPos.block != nil {
 			blockPos.Draw(view, &state)
 		}
-		if edge != nil && edge.block != nil {
-			edge.Draw(view, &state)
+
+		if z == 0 {
+			edge := view.edges[x][y]
+			if edge.block != nil {
+				edge.Draw(view, &state)
+			}
 		}
 	})
 	if view.Cursor.block != nil {
@@ -466,8 +495,33 @@ func (b *BlockPos) Draw(view *View, state *DrawState) {
 		state.vbo = b.block.vbo
 	}
 	gl.UniformMatrix4fv(view.modelUniform, 1, false, &b.model[0])
+
+	animated := false
+	if b.dir != nil {
+		if animation, ok := b.block.shape.Animations["move"]; ok {
+			b.incrAnimationStep(animation)
+			if steps, ok := animation.Tex[string(*b.dir)]; ok {
+				gl.Uniform1f(view.textureOffsetUniform, steps[b.animationStep].TexOffset[0])
+				animated = true
+			}
+		}
+	}
+	if !animated {
+		gl.Uniform1f(view.textureOffsetUniform, 0)
+	}
 	gl.DrawArrays(gl.TRIANGLES, 0, 3*2*3)
 	state.init = true
+}
+
+func (b *BlockPos) incrAnimationStep(animation *shapes.Animation) {
+	current := glfw.GetTime()
+	if current-b.animationTimer > 0.05 {
+		b.animationTimer = current
+		b.animationStep++
+	}
+	if b.animationStep >= animation.Steps {
+		b.animationStep = 0
+	}
 }
 
 func (view *View) Zoom(zoom float64) {
@@ -483,11 +537,13 @@ var vertexShader = `
 uniform mat4 projection;
 uniform mat4 camera;
 uniform mat4 model;
+uniform float textureOffset;
 in vec3 vert;
 in vec2 vertTexCoord;
 out vec2 fragTexCoord;
 void main() {
-    fragTexCoord = vertTexCoord;
+    fragTexCoord = vec2(vertTexCoord.x + textureOffset, vertTexCoord.y);
+	// fragTexCoord = vertTexCoord;
     gl_Position = projection * camera * model * vec4(vert, 1);
 }
 ` + "\x00"

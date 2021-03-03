@@ -41,26 +41,20 @@ func NewSectionCache() *SectionCache {
 	return &SectionCache{}
 }
 
-type Display interface {
-	Invalidate()
-}
-
 type Loader struct {
 	dir          string
 	X, Y         int
 	sectionCache *SectionCache
-	display      Display
 }
 
-func NewLoader(dir string, x, y int, display Display) *Loader {
-	return &Loader{dir, x, y, NewSectionCache(), display}
+func NewLoader(dir string, x, y int) *Loader {
+	return &Loader{dir, x, y, NewSectionCache()}
 }
 
 func (loader *Loader) MoveTo(x, y int) bool {
 	if x >= 0 && y >= 0 && (loader.X != x || loader.Y != y) {
 		loader.X = x
 		loader.Y = y
-		loader.display.Invalidate()
 		return true
 	}
 	return false
@@ -69,13 +63,11 @@ func (loader *Loader) MoveTo(x, y int) bool {
 func (loader *Loader) ClearEdge(x, y int) {
 	section, atomX, atomY, _ := loader.getPosInSection(x, y, 0)
 	section.edges[atomX][atomY].Shape = 0
-	// loader.display.Invalidate()
 }
 
 func (loader *Loader) SetEdge(x, y int, shapeIndex int) {
 	section, atomX, atomY, _ := loader.getPosInSection(x, y, 0)
 	section.edges[atomX][atomY].Shape = shapeIndex + 1
-	// loader.display.Invalidate()
 }
 
 func (loader *Loader) GetEdge(x, y int) (int, bool) {
@@ -90,7 +82,6 @@ func (loader *Loader) GetEdge(x, y int) (int, bool) {
 func (loader *Loader) SetShape(x, y, z int, shapeIndex int) bool {
 	section, atomX, atomY, atomZ := loader.getPosInSection(x, y, z)
 	section.position[atomX][atomY][atomZ].Shape = shapeIndex + 1
-	// loader.display.Invalidate()
 	return true
 }
 
@@ -99,7 +90,6 @@ func (loader *Loader) EraseShape(x, y, z int) bool {
 	shapeIndex := section.position[atomX][atomY][atomZ].Shape
 	if shapeIndex > 0 {
 		section.position[atomX][atomY][atomZ].Shape = 0
-		// loader.display.Invalidate()
 		return true
 	}
 	return false

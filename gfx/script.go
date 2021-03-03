@@ -14,8 +14,7 @@ func setShape(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	z := int(arg[2].(float64))
 	name := arg[3].(string)
 	app := ctx.App["app"].(*App)
-	app.Loader.SetShape(x, y, z, shapes.Names[name])
-	app.Invalidate()
+	app.View.SetShape(x, y, z, shapes.Names[name])
 	return nil, nil
 }
 
