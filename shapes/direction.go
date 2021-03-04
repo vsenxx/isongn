@@ -1,54 +1,53 @@
 package shapes
 
-type Direction string
+type Direction int
 
-var DIR_W = Direction("w")
+var DIR_W = Direction(0)
+var DIR_SW = Direction(1)
+var DIR_S = Direction(2)
+var DIR_SE = Direction(3)
+var DIR_E = Direction(4)
+var DIR_NE = Direction(5)
+var DIR_N = Direction(6)
+var DIR_NW = Direction(7)
+var DIR_NONE = Direction(8)
 
-var DIR_SW = Direction("sw")
-var DIR_S = Direction("s")
-var DIR_SE = Direction("se")
-var DIR_E = Direction("e")
-var DIR_NE = Direction("ne")
-var DIR_N = Direction("n")
-var DIR_NW = Direction("nw")
-var DIR_NONE = Direction("none")
-
-var Directions = []*Direction{
-	&DIR_W,
-	&DIR_SW,
-	&DIR_S,
-	&DIR_SE,
-	&DIR_E,
-	&DIR_NE,
-	&DIR_N,
-	&DIR_NW,
-	&DIR_NONE,
+var Directions = map[string]Direction{
+	"w":  DIR_W,
+	"sw": DIR_SW,
+	"s":  DIR_S,
+	"se": DIR_SE,
+	"e":  DIR_E,
+	"ne": DIR_NE,
+	"n":  DIR_N,
+	"nw": DIR_NW,
+	"":   DIR_NONE,
 }
 
-func GetDir(oldX, oldY, newX, newY int) *Direction {
-	if oldX < newX && oldY == newY {
-		return &DIR_W
+func GetDir(dx, dy int) Direction {
+	if dx == 1 && dy == 0 {
+		return DIR_W
 	}
-	if oldX > newX && oldY == newY {
-		return &DIR_E
+	if dx == -1 && dy == 0 {
+		return DIR_E
 	}
-	if oldX == newX && oldY < newY {
-		return &DIR_S
+	if dx == 0 && dy == 1 {
+		return DIR_S
 	}
-	if oldX == newX && oldY > newY {
-		return &DIR_N
+	if dx == 0 && dy == -1 {
+		return DIR_N
 	}
-	if oldX < newX && oldY < newY {
-		return &DIR_SW
+	if dx == 1 && dy == 1 {
+		return DIR_SW
 	}
-	if oldX > newX && oldY > newY {
-		return &DIR_NE
+	if dx == -1 && dy == -1 {
+		return DIR_NE
 	}
-	if oldX > newX && oldY < newY {
-		return &DIR_SE
+	if dx == -1 && dy == 1 {
+		return DIR_SE
 	}
-	if oldX < newX && oldY > newY {
-		return &DIR_NW
+	if dx == 1 && dy == -1 {
+		return DIR_NW
 	}
-	return &DIR_NONE
+	return DIR_NONE
 }

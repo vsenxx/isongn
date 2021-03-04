@@ -17,9 +17,9 @@ import (
 )
 
 type Game interface {
-	Init(app *App)
+	Init(app *App, config map[string]interface{})
 	Name() string
-	Events()
+	Events(delta float64)
 	GetZ() int
 }
 
@@ -114,7 +114,9 @@ func NewApp(game Game, gameDir string, windowWidth, windowHeight int, targetFps 
 }
 
 func parseConfig(gameDir string) *AppConfig {
-	bytes, err := ioutil.ReadFile(filepath.Join(gameDir, "config.json"))
+	configPath := filepath.Join(gameDir, "config.json")
+	fmt.Printf("Looking for config file: %s\n", configPath)
+	bytes, err := ioutil.ReadFile(configPath)
 	if err != nil {
 		panic(err)
 	}
@@ -270,18 +272,18 @@ func (app *App) CalcFps() {
 	}
 }
 
-func (app *App) Sleep(lastTime float64) float64 {
+func (app *App) Sleep(lastTime float64) (float64, float64) {
 	now := glfw.GetTime()
 	d := now - lastTime
 	sleep := ((1.0 / app.targetFps) - d) * 1000.0
 	if sleep > 0 {
 		time.Sleep(time.Duration(sleep) * time.Millisecond)
 	}
-	return now
+	return now, d
 }
 
 func (app *App) Run() {
-	app.Game.Init(app)
+	app.Game.Init(app, app.Config.runtime[app.Game.Name()].(map[string]interface{}))
 
 	// Configure global settings
 	gl.Enable(gl.DEPTH_TEST)
@@ -289,18 +291,19 @@ func (app *App) Run() {
 	// gl.ClearColor(0, 0, 0, 0)
 
 	last := glfw.GetTime()
+	var delta float64
 	for !app.Window.ShouldClose() {
 		// reduce fan noise / run at target fps
-		last = app.Sleep(last)
+		last, delta = app.Sleep(last)
 
 		// show FPS in window title
 		app.CalcFps()
 
 		// handle events
-		app.Game.Events()
+		app.Game.Events(delta)
 
 		app.frameBuffer.Enable(app.Width, app.Height)
-		app.View.Draw()
+		app.View.Draw(delta)
 		app.frameBuffer.Draw(app.windowWidthDpi, app.windowHeightDpi)
 
 		app.uiFrameBuffer.Enable(app.Width, app.Height)

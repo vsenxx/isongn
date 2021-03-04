@@ -8,7 +8,11 @@
             "resolution": [ 1024, 768 ]
         },
         "runner": {
-            "resolution": [ 320, 240 ]
+            "resolution": [ 320, 240 ],
+            "speed": 50,
+            "player": "cow",
+            "start": [976, 1028],
+            "playerSpeed": 0.085
         }        
     },
     "view": {

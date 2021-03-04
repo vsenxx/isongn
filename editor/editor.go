@@ -34,7 +34,7 @@ func NewEditor() *Editor {
 	}
 }
 
-func (e *Editor) Init(app *gfx.App) {
+func (e *Editor) Init(app *gfx.App, config map[string]interface{}) {
 	e.app = app
 	e.app.View.Load()
 
@@ -92,7 +92,7 @@ func (e *Editor) isMoveKey() (int, int, bool) {
 	return 0, 0, false
 }
 
-func (e *Editor) Events() {
+func (e *Editor) Events(delta float64) {
 
 	if e.app.Loader.X != e.lastX || e.app.Loader.Y != e.lastY || e.updateCursor {
 		e.Z = e.findTop(e.app.Loader.X, e.app.Loader.Y)

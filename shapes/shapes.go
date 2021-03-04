@@ -34,7 +34,7 @@ type TextureCoords struct {
 type Animation struct {
 	Name  string
 	Steps int
-	Tex   map[string][]*TextureCoords
+	Tex   map[Direction][]*TextureCoords
 }
 
 type Shape struct {
@@ -49,12 +49,24 @@ type Shape struct {
 	Edges         map[string]map[string][]*Shape
 	Offset        [3]float32
 	EditorVisible bool
-	Animations    map[string]*Animation
+	Animations    map[int]*Animation
 }
 
 var Shapes []*Shape
 var Names map[string]int = map[string]int{}
 var Images []image.Image
+
+// some pre-defined animations
+const ANIMATION_MOVE = 0
+const ANIMATION_STAND = 1
+const ANIMATION_ATTACK = 2
+
+// but more can be added
+var AnimationNames map[string]int = map[string]int{
+	"move":   ANIMATION_MOVE,
+	"stand":  ANIMATION_STAND,
+	"attack": ANIMATION_ATTACK,
+}
 
 func InitShapes(gameDir string, data []map[string]interface{}) error {
 	for _, block := range data {
@@ -254,7 +266,7 @@ func InitCreatures(gameDir string, data []map[string]interface{}) error {
 			Name:       name,
 			Size:       size,
 			ImageIndex: imageIndex,
-			Animations: map[string]*Animation{},
+			Animations: map[int]*Animation{},
 		}
 
 		// add a gap, if needed
@@ -274,7 +286,7 @@ func InitCreatures(gameDir string, data []map[string]interface{}) error {
 			a := &Animation{
 				Name:  frame["name"].(string),
 				Steps: int(frame["steps"].(float64)),
-				Tex:   map[string][]*TextureCoords{},
+				Tex:   map[Direction][]*TextureCoords{},
 			}
 			dirs := frame["dirs"].([]interface{})
 			for _, dirI := range dirs {
@@ -290,12 +302,18 @@ func InitCreatures(gameDir string, data []map[string]interface{}) error {
 					}
 					xpos += dim[0]
 				}
-				fmt.Printf("\t\t\tadding %d steps for: %s\n", a.Steps, dirI.(string))
-				a.Tex[dirI.(string)] = dirFrames
+				dir := dirI.(string)
+				fmt.Printf("\t\t\tadding %d steps for: %s\n", a.Steps, dir)
+				a.Tex[Directions[dir]] = dirFrames
 			}
 			frameName := frame["name"].(string)
+			animationIndex, ok := AnimationNames[frameName]
+			if ok == false {
+				animationIndex = len(AnimationNames)
+				AnimationNames[frameName] = animationIndex
+			}
 			fmt.Printf("\t\tadding animations for: %s\n", frameName)
-			shape.Animations[frameName] = a
+			shape.Animations[animationIndex] = a
 		}
 	}
 	return nil
