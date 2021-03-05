@@ -370,6 +370,23 @@ func (view *View) FindTop(worldX, worldY int, shape *shapes.Shape) int {
 	return maxZ
 }
 
+func (view *View) InspectUnder(worldX, worldY, worldZ int, shape *shapes.Shape, registeredShapes map[string]bool) bool {
+	res := false
+	for x := 0; x < int(shape.Size[0]); x++ {
+		for y := 0; y < int(shape.Size[1]); y++ {
+			shapeIndex, _, _, _, found := view.GetShape(worldX+x, worldY+y, worldZ-1)
+			if found {
+				shape := shapes.Shapes[shapeIndex]
+				if _, ok := registeredShapes[shape.Name]; ok {
+					registeredShapes[shape.Name] = true
+					res = true
+				}
+			}
+		}
+	}
+	return res
+}
+
 func (view *View) SetShape(worldX, worldY, worldZ int, shapeIndex int) *BlockPos {
 	view.Loader.SetShape(worldX, worldY, worldZ, shapeIndex)
 	return view.setShapeInner(worldX, worldY, worldZ, shapeIndex, true)

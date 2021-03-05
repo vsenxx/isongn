@@ -2,6 +2,7 @@ package runner
 
 import (
 	"github.com/go-gl/glfw/v3.3/glfw"
+	"github.com/uzudil/bscript/bscript"
 	"github.com/uzudil/isongn/gfx"
 	"github.com/uzudil/isongn/shapes"
 )
@@ -13,11 +14,16 @@ type Runner struct {
 	dir            shapes.Direction
 	speed          float64
 	lastDx, lastDy int
+	shapeCallbacks map[string]bool
+	ctx            *bscript.Context
+	onShapeCall    *bscript.Variable
+	onShapeArg     *bscript.Value
 }
 
 func NewRunner() *Runner {
 	return &Runner{
-		z: 1,
+		z:              1,
+		shapeCallbacks: map[string]bool{},
 	}
 }
 
@@ -32,6 +38,13 @@ func (runner *Runner) Init(app *gfx.App, config map[string]interface{}) {
 	runner.app.Loader.MoveTo(int(start[0].(float64)), int(start[1].(float64)))
 	runner.app.View.Load()
 	runner.app.View.SetShape(runner.app.Loader.X, runner.app.Loader.Y, runner.z, runner.player.Index)
+
+	// register some runner-specific callbacks and init bscript
+	runner.ctx = InitScript(app)
+
+	// create a function call + arg for "onShape()"
+	runner.onShapeArg = &bscript.Value{}
+	runner.onShapeCall = NewFunctionCall("onShape", runner.onShapeArg)
 }
 
 func (runner *Runner) Name() string {
@@ -112,7 +125,7 @@ func (runner *Runner) playerMoveDir(dx, dy int, delta float64) (bool, float32, f
 	if newX != oldX || newY != oldY {
 		runner.app.View.EraseShape(oldX, oldY, oldZ)
 		newZ := runner.app.View.FindTop(newX, newY, runner.player)
-		if newZ <= runner.z+1 {
+		if newZ <= runner.z+1 && runner.inspectUnder(newX, newY, newZ) {
 			runner.app.Loader.MoveTo(newX, newY)
 			runner.app.View.Load()
 			runner.z = newZ
@@ -125,6 +138,33 @@ func (runner *Runner) playerMoveDir(dx, dy int, delta float64) (bool, float32, f
 	return moved, newXf, newYf, newX, newY
 }
 
+func (runner *Runner) inspectUnder(newX, newY, newZ int) bool {
+	res := true
+	// are we standing on a shape we're interested in?
+	if len(runner.shapeCallbacks) > 0 && runner.app.View.InspectUnder(newX, newY, newZ, runner.player, runner.shapeCallbacks) {
+		for name := range runner.shapeCallbacks {
+			if runner.shapeCallbacks[name] {
+				// call the script
+				runner.onShapeArg.String = &name
+				result, err := runner.onShapeCall.Evaluate(runner.ctx)
+				if err != nil {
+					panic(err)
+				}
+
+				res = result.(bool)
+
+				// reset the callback
+				runner.shapeCallbacks[name] = false
+			}
+		}
+	}
+	return res
+}
+
 func (runner *Runner) GetZ() int {
 	return runner.z
+}
+
+func (runner *Runner) RegisterShapeCallback(name string) {
+	runner.shapeCallbacks[name] = false
 }

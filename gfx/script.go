@@ -8,6 +8,11 @@ import (
 	"github.com/uzudil/isongn/shapes"
 )
 
+func print(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+	fmt.Println(arg[0].(string))
+	return nil, nil
+}
+
 func setShape(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	x := int(arg[0].(float64))
 	y := int(arg[1].(float64))
@@ -167,6 +172,7 @@ func InitScript() {
 	bscript.AddBuiltin("isPressed", isPressed)
 	bscript.AddBuiltin("getPosition", getPosition)
 	bscript.AddBuiltin("setShape", setShape)
+	bscript.AddBuiltin("print", print)
 	for k, v := range constants {
 		bscript.AddConstant(k, v)
 	}

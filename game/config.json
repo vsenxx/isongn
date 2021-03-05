@@ -8,9 +8,9 @@
             "resolution": [ 1024, 768 ]
         },
         "runner": {
-            "resolution": [ 320, 240 ],
+            "resolution": [ 400, 300 ],
             "speed": 50,
-            "player": "cow",
+            "player": "man",
             "start": [976, 1028],
             "playerSpeed": 0.085
         }        
@@ -165,6 +165,28 @@
         }
     ],    
     "creatures": [
+        { 
+            "name": "man", 
+            "size": [ 2, 2, 4 ], 
+            "dim": [ 64, 64 ], 
+            "frames": [
+                {
+                    "name": "move",
+                    "steps": 4,
+                    "dirs": [ "s", "se", "e", "ne", "n", "nw", "w", "sw" ]
+                },
+                {
+                    "name": "stand",
+                    "steps": 1,
+                    "dirs": ["sw", "s", "se", "e", "ne", "n", "nw", "w"]
+                },
+                {
+                    "name": "attack",
+                    "steps": 1,
+                    "dirs": ["s", "se", "e", "ne", "n", "nw", "w", "sw"]
+                }
+            ]
+        },
         { 
             "name": "cow", 
             "size": [ 4, 4, 2 ], 

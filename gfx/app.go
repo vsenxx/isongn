@@ -115,7 +115,6 @@ func NewApp(game Game, gameDir string, windowWidth, windowHeight int, targetFps 
 
 func parseConfig(gameDir string) *AppConfig {
 	configPath := filepath.Join(gameDir, "config.json")
-	fmt.Printf("Looking for config file: %s\n", configPath)
 	bytes, err := ioutil.ReadFile(configPath)
 	if err != nil {
 		panic(err)
