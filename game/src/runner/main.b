@@ -134,14 +134,20 @@ def replaceShape(x, y, z, name) {
     }
 }
 
-def findShapeUnder(px, py, pz, fx) {
+def forPlayerBase(fx) {
     range(0, PLAYER_X, 1, x => {
         range(0, PLAYER_Y, 1, y => {
-            info := getShape(px + x, py + y, pz - 1);
-            if(info != null) {
-                fx(info);
-            }
+            fx(x, y);
         });
+    });
+}
+
+def findShapeUnder(px, py, pz, fx) {
+    forPlayerBase((x, y) => {
+        info := getShape(px + x, py + y, pz - 1);
+        if(info != null) {
+            fx(info);
+        }
     });
 }
 
@@ -174,17 +180,15 @@ def isUnderRoof() {
     found := [true];
     # roofs are only at certain heights
     z := getRoofZ();
-    range(0, PLAYER_X, 1, x => {
-        range(0, PLAYER_Y, 1, y => {
-            info := getShape(player.x + x, player.y + y, z);
-            if(info = null) {
+    forPlayerBase((x, y) => {
+        info := getShape(player.x + x, player.y + y, z);
+        if(info = null) {
+            found[0] := false;
+        } else {
+            if(substr(info[0], 0, 5) != "roof.") {
                 found[0] := false;
-            } else {
-                if(substr(info[0], 0, 5) != "roof.") {
-                    found[0] := false;
-                }
             }
-        });
+        }
     });
     return found[0];
 }
