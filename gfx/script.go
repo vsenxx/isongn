@@ -13,6 +13,15 @@ func print(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	return nil, nil
 }
 
+func eraseShape(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+	x := int(arg[0].(float64))
+	y := int(arg[1].(float64))
+	z := int(arg[2].(float64))
+	app := ctx.App["app"].(*App)
+	app.View.EraseShape(x, y, z)
+	return nil, nil
+}
+
 func setShape(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	x := int(arg[0].(float64))
 	y := int(arg[1].(float64))
@@ -20,6 +29,22 @@ func setShape(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	name := arg[3].(string)
 	app := ctx.App["app"].(*App)
 	app.View.SetShape(x, y, z, shapes.Names[name])
+	return nil, nil
+}
+
+func getShape(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+	x := int(arg[0].(float64))
+	y := int(arg[1].(float64))
+	z := int(arg[2].(float64))
+	app := ctx.App["app"].(*App)
+	if shapeIndex, ox, oy, oz, found := app.View.GetShape(x, y, z); found {
+		r := make([]interface{}, 4)
+		r[0] = shapes.Shapes[shapeIndex].Name
+		r[1] = float64(ox)
+		r[2] = float64(oy)
+		r[3] = float64(oz)
+		return &r, nil
+	}
 	return nil, nil
 }
 
@@ -171,9 +196,39 @@ var constants map[string]interface{} = map[string]interface{}{
 func InitScript() {
 	bscript.AddBuiltin("isPressed", isPressed)
 	bscript.AddBuiltin("getPosition", getPosition)
+	bscript.AddBuiltin("eraseShape", eraseShape)
 	bscript.AddBuiltin("setShape", setShape)
+	bscript.AddBuiltin("getShape", getShape)
 	bscript.AddBuiltin("print", print)
 	for k, v := range constants {
 		bscript.AddConstant(k, v)
+	}
+}
+
+func NewFunctionCall(functionName string, values ...*bscript.Value) *bscript.Variable {
+	args := make([]*bscript.Expression, len(values))
+	for i, v := range values {
+		args[i] = &bscript.Expression{
+			BoolTerm: &bscript.BoolTerm{
+				Left: &bscript.Cmp{
+					Left: &bscript.Term{
+						Left: &bscript.Factor{
+							Base: v,
+						},
+					},
+				},
+			},
+		}
+	}
+
+	return &bscript.Variable{
+		Variable: functionName,
+		Suffixes: []*bscript.VariableSuffix{
+			{
+				CallParams: &bscript.CallParams{
+					Args: args,
+				},
+			},
+		},
 	}
 }

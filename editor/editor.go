@@ -13,6 +13,7 @@ import (
 	"github.com/go-gl/glfw/v3.3/glfw"
 	"github.com/uzudil/isongn/gfx"
 	"github.com/uzudil/isongn/shapes"
+	"github.com/uzudil/isongn/world"
 )
 
 type Editor struct {
@@ -22,7 +23,7 @@ type Editor struct {
 	infoUpdate          bool
 	Z                   int
 	ctx                 *bscript.Context
-	command             *bscript.Command
+	editorCall          *bscript.Variable
 	lastX, lastY        int
 	updateCursor        bool
 }
@@ -53,11 +54,7 @@ func (e *Editor) Init(app *gfx.App, config map[string]interface{}) {
 	e.ctx = ctx
 
 	// create the editor bscript calls
-	e.command = &bscript.Command{}
-	err = bscript.CommandParser.ParseString("editorCommand();", e.command)
-	if err != nil {
-		panic(err)
-	}
+	e.editorCall = gfx.NewFunctionCall("editorCommand")
 
 	// add a ui
 	e.app.Ui.Add(int(e.app.Width)-150, 0, 150, int(e.app.Height), e.shapeSelectorContents)
@@ -95,11 +92,20 @@ func (e *Editor) isMoveKey() (int, int, bool) {
 func (e *Editor) Events(delta float64) {
 
 	if e.app.Loader.X != e.lastX || e.app.Loader.Y != e.lastY || e.updateCursor {
-		e.Z = e.findTop(e.app.Loader.X, e.app.Loader.Y)
+		// e.Z = e.findTop(e.app.Loader.X, e.app.Loader.Y)
 		e.app.View.SetCursor(e.shapeSelectorIndex, e.Z)
 		e.lastX = e.app.Loader.X
 		e.lastY = e.app.Loader.Y
 		e.updateCursor = false
+	}
+
+	if e.app.IsFirstDown(glfw.KeyPeriod) && e.Z < world.SECTION_Z_SIZE-1 {
+		e.Z++
+		e.updateCursor = true
+	}
+	if e.app.IsFirstDown(glfw.KeyComma) && e.Z > 0 {
+		e.Z--
+		e.updateCursor = true
 	}
 
 	if e.app.IsDownAlt1(glfw.KeyLeftBracket) && e.shapeSelectorIndex > 0 {
@@ -136,11 +142,12 @@ func (e *Editor) Events(delta float64) {
 		changed = true
 	}
 	if e.app.IsFirstDown(glfw.KeyE) && e.Z > 0 {
-		shapes.Shapes[e.shapeSelectorIndex].Traverse(func(xx, yy, zz int) {
+		shapes.Shapes[e.shapeSelectorIndex].Traverse(func(xx, yy, zz int) bool {
 			if zz == 0 {
 				e.app.View.EraseShape(e.app.Loader.X+xx, e.app.Loader.Y+yy, e.Z-1)
 				changed = true
 			}
+			return false
 		})
 	}
 
@@ -152,11 +159,12 @@ func (e *Editor) Events(delta float64) {
 	}
 
 	// call bscript
-	e.command.Evaluate(e.ctx)
+	e.editorCall.Evaluate(e.ctx)
 
 	// move
 	if e.app.Loader.MoveTo(e.app.Loader.X+dx, e.app.Loader.Y+dy) {
 		e.app.View.Load()
+		e.Z = e.findTop(e.app.Loader.X, e.app.Loader.Y)
 		e.infoUpdate = true
 	}
 

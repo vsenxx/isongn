@@ -15,15 +15,23 @@ type Runner struct {
 	speed          float64
 	lastDx, lastDy int
 	shapeCallbacks map[string]bool
+	keyCallbacks   map[glfw.Key]bool
 	ctx            *bscript.Context
 	onShapeCall    *bscript.Variable
 	onShapeArg     *bscript.Value
+	onKeyCall      *bscript.Variable
+	onKeyArg       *bscript.Value
+	onMoveXArg     *bscript.Value
+	onMoveYArg     *bscript.Value
+	onMoveZArg     *bscript.Value
+	onMoveCall     *bscript.Variable
 }
 
 func NewRunner() *Runner {
 	return &Runner{
 		z:              1,
 		shapeCallbacks: map[string]bool{},
+		keyCallbacks:   map[glfw.Key]bool{},
 	}
 }
 
@@ -44,7 +52,15 @@ func (runner *Runner) Init(app *gfx.App, config map[string]interface{}) {
 
 	// create a function call + arg for "onShape()"
 	runner.onShapeArg = &bscript.Value{}
-	runner.onShapeCall = NewFunctionCall("onShape", runner.onShapeArg)
+	runner.onShapeCall = gfx.NewFunctionCall("onShape", runner.onShapeArg)
+
+	runner.onKeyArg = &bscript.Value{Number: &bscript.SignedNumber{}}
+	runner.onKeyCall = gfx.NewFunctionCall("onKey", runner.onKeyArg)
+
+	runner.onMoveXArg = &bscript.Value{Number: &bscript.SignedNumber{}}
+	runner.onMoveYArg = &bscript.Value{Number: &bscript.SignedNumber{}}
+	runner.onMoveZArg = &bscript.Value{Number: &bscript.SignedNumber{}}
+	runner.onMoveCall = gfx.NewFunctionCall("onPlayerMove", runner.onMoveXArg, runner.onMoveYArg, runner.onMoveZArg)
 }
 
 func (runner *Runner) Name() string {
@@ -77,6 +93,14 @@ func (runner *Runner) Events(delta float64) {
 		runner.playerMove(dx, dy, delta)
 	}
 	runner.app.View.SetShapeAnimation(runner.app.Loader.X, runner.app.Loader.Y, runner.z, animationType, runner.dir)
+
+	// make any registered key callbacks
+	for k := range runner.keyCallbacks {
+		if runner.app.IsFirstDown(k) {
+			runner.onKeyArg.Number.Number = float64(k)
+			runner.onKeyCall.Evaluate(runner.ctx)
+		}
+	}
 }
 
 func (runner *Runner) playerMove(dx, dy int, delta float64) {
@@ -124,11 +148,17 @@ func (runner *Runner) playerMoveDir(dx, dy int, delta float64) (bool, float32, f
 	newY := int(newYf + 0.5)
 	if newX != oldX || newY != oldY {
 		runner.app.View.EraseShape(oldX, oldY, oldZ)
-		newZ := runner.app.View.FindTop(newX, newY, runner.player)
+		newZ := runner.app.View.FindTopFit(newX, newY, runner.player)
 		if newZ <= runner.z+1 && runner.inspectUnder(newX, newY, newZ) {
 			runner.app.Loader.MoveTo(newX, newY)
 			runner.app.View.Load()
 			runner.z = newZ
+
+			// update the script
+			runner.onMoveXArg.Number.Number = float64(newX)
+			runner.onMoveYArg.Number.Number = float64(newY)
+			runner.onMoveZArg.Number.Number = float64(newZ)
+			runner.onMoveCall.Evaluate(runner.ctx)
 		} else {
 			// player is blocked
 			moved = false
@@ -167,4 +197,8 @@ func (runner *Runner) GetZ() int {
 
 func (runner *Runner) RegisterShapeCallback(name string) {
 	runner.shapeCallbacks[name] = false
+}
+
+func (runner *Runner) RegisterKey(key glfw.Key) {
+	runner.keyCallbacks[key] = true
 }

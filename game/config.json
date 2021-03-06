@@ -158,9 +158,24 @@
             },
             "dpi": 288,
             "shapes": [
-                { "name": "roof.tile.x", "size": [ 12, 12, 6], "pos": [0, 96] },
-                { "name": "roof.tile.y", "size": [ 12, 12, 6], "pos": [192, 96] },
-                { "name": "roof.lattice", "size": [ 10, 10, 1], "pos": [392, 120] }
+                { "name": "roof.lattice", "size": [ 10, 10, 1], "pos": [392, 120] },
+                { "name": "roof.gray.sw", "size": [ 6, 6, 6], "pos": [0, 464] },
+                { "name": "roof.gray.nw", "size": [ 6, 6, 6], "pos": [96, 464] },
+                { "name": "roof.gray.ne", "size": [ 6, 6, 6], "pos": [192, 464] },
+                { "name": "roof.gray.se", "size": [ 6, 6, 6], "pos": [288, 464] },
+                { "name": "roof.gray.w", "size": [ 6, 4, 6], "pos": [8, 616] },
+                { "name": "roof.gray.e", "size": [ 6, 4, 6], "pos": [88, 616] },
+                { "name": "roof.gray.s", "size": [ 4, 6, 6], "pos": [168, 616] },
+                { "name": "roof.gray.n", "size": [ 4, 6, 6], "pos": [248, 616] },
+                { "name": "roof.gray", "size": [ 4, 4, 6], "pos": [328, 632] },
+                { "name": "roof.gray.sw2", "size": [ 6, 6, 6], "pos": [0, 320] },
+                { "name": "roof.gray.se2", "size": [ 6, 6, 6], "pos": [96, 320] },
+                { "name": "roof.gray.ne2", "size": [ 6, 6, 6], "pos": [192, 320] },
+                { "name": "roof.gray.nw2", "size": [ 6, 6, 6], "pos": [288, 320] },
+                { "name": "roof.gray.w2", "size": [ 6, 6, 6], "pos": [0, 752] },
+                { "name": "roof.gray.e2", "size": [ 6, 6, 6], "pos": [96, 752] },
+                { "name": "roof.gray.s2", "size": [ 6, 6, 6], "pos": [192, 752] },
+                { "name": "roof.gray.n2", "size": [ 6, 6, 6], "pos": [288, 752] }
             ]
         }
     ],    

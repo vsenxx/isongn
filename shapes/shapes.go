@@ -329,11 +329,13 @@ func loadImage(path string) (image.Image, error) {
 	return img, err
 }
 
-func (shape *Shape) Traverse(fx func(x, y, z int)) {
+func (shape *Shape) Traverse(fx func(x, y, z int) bool) {
 	for xx := 0; xx < int(shape.Size[0]); xx++ {
 		for yy := 0; yy < int(shape.Size[1]); yy++ {
 			for zz := 0; zz < int(shape.Size[2]); zz++ {
-				fx(xx, yy, zz)
+				if fx(xx, yy, zz) {
+					return
+				}
 			}
 		}
 	}

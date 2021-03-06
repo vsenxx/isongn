@@ -61,6 +61,7 @@ type View struct {
 	shear                [3]float32
 	Cursor               *BlockPos
 	ScrollOffset         [2]float32
+	maxZ                 int
 }
 
 const viewSize = 10
@@ -87,6 +88,7 @@ func InitView(zoom float64, camera, shear [3]float32, loader *world.Loader) *Vie
 		zoom:   zoom,
 		shear:  shear,
 		Loader: loader,
+		maxZ:   world.SECTION_Z_SIZE,
 	}
 	view.projection = getProjection(float32(view.zoom), view.shear)
 
@@ -297,6 +299,10 @@ func (b *Block) vertices() []float32 {
 	return v
 }
 
+func (view *View) SetMaxZ(z int) {
+	view.maxZ = z
+}
+
 func (view *View) Load() {
 	// reset
 	view.traverse(func(x, y, z int) {
@@ -353,6 +359,31 @@ func (view *View) GetShape(worldX, worldY, worldZ int) (int, int, int, int, bool
 	}
 	originWorldX, originWorldY, originWorldZ := view.toWorldPos(b.x, b.y, b.z)
 	return b.block.shape.Index, originWorldX, originWorldY, originWorldZ, true
+}
+
+func (view *View) FindTopFit(worldX, worldY int, shape *shapes.Shape) int {
+	for z := 0; z < world.SECTION_Z_SIZE; z++ {
+		if view.Fits(worldX, worldY, z, shape) {
+			return z
+		}
+	}
+	return 0
+}
+
+func (view *View) Fits(worldX, worldY, worldZ int, shape *shapes.Shape) bool {
+	fits := true
+	shape.Traverse(func(x, y, z int) bool {
+		viewX, viewY, viewZ, validPos := view.toViewPos(worldX+x, worldY+y, worldZ+z)
+		if validPos {
+			b := view.origins[viewX][viewY][viewZ]
+			if b != nil && b.block != nil {
+				fits = false
+				return true
+			}
+		}
+		return false
+	})
+	return fits
 }
 
 func (view *View) FindTop(worldX, worldY int, shape *shapes.Shape) int {
@@ -414,7 +445,7 @@ func (view *View) setShapeInner(worldX, worldY, worldZ int, shapeIndex int, hasS
 			blockPos.block = nil
 		}
 
-		shape.Traverse(func(shapeX, shapeY, shapeZ int) {
+		shape.Traverse(func(shapeX, shapeY, shapeZ int) bool {
 			if viewX+shapeX < SIZE && viewY+shapeY < SIZE && viewZ+shapeZ < world.SECTION_Z_SIZE {
 				if hasShape {
 					view.origins[viewX+shapeX][viewY+shapeY][viewZ+shapeZ] = blockPos
@@ -422,6 +453,7 @@ func (view *View) setShapeInner(worldX, worldY, worldZ int, shapeIndex int, hasS
 					view.origins[viewX+shapeX][viewY+shapeY][viewZ+shapeZ] = nil
 				}
 			}
+			return false
 		})
 
 		return blockPos
@@ -524,7 +556,7 @@ func (view *View) Draw(delta float64) {
 	state.init = false
 	view.traverse(func(x, y, z int) {
 		blockPos := view.blockPos[x][y][z]
-		if blockPos.block != nil {
+		if blockPos.block != nil && z < view.maxZ {
 			blockPos.Draw(view)
 		}
 
