@@ -32,6 +32,60 @@ func setShape(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	return nil, nil
 }
 
+func setOffset(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+	x := int(arg[0].(float64))
+	y := int(arg[1].(float64))
+	z := int(arg[2].(float64))
+	sx := float32(arg[3].(float64))
+	sy := float32(arg[4].(float64))
+	app := ctx.App["app"].(*App)
+	app.View.SetOffset(x, y, z, sx, sy)
+	return nil, nil
+}
+
+func setViewScroll(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+	sx := float32(arg[0].(float64))
+	sy := float32(arg[1].(float64))
+	app := ctx.App["app"].(*App)
+	app.View.Scroll(sx, sy)
+	return nil, nil
+}
+
+func setAnimation(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+	x := int(arg[0].(float64))
+	y := int(arg[1].(float64))
+	z := int(arg[2].(float64))
+	name := arg[3].(string)
+	dir := arg[4].(float64)
+	app := ctx.App["app"].(*App)
+	app.View.SetShapeAnimation(x, y, z, shapes.AnimationNames[name], shapes.Direction(dir))
+	return nil, nil
+}
+
+func findTopFit(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+	x := int(arg[0].(float64))
+	y := int(arg[1].(float64))
+	name := arg[2].(string)
+	app := ctx.App["app"].(*App)
+	newZ := app.View.FindTopFit(x, y, shapes.Shapes[shapes.Names[name]])
+	return float64(newZ), nil
+}
+
+func moveViewTo(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+	x := int(arg[0].(float64))
+	y := int(arg[1].(float64))
+	app := ctx.App["app"].(*App)
+	app.Loader.MoveTo(x, y)
+	app.View.Load()
+	return nil, nil
+}
+
+func getDir(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+	dx := int(arg[0].(float64))
+	dy := int(arg[1].(float64))
+	return float64(shapes.GetDir(int(dx), int(dy))), nil
+}
+
 func getShape(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	x := int(arg[0].(float64))
 	y := int(arg[1].(float64))
@@ -67,7 +121,23 @@ func isPressed(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	return nil, fmt.Errorf("%s unable to parse key at", ctx.Pos)
 }
 
+func isDown(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+	key := glfw.Key(arg[0].(float64))
+	app := ctx.App["app"].(*App)
+	return app.IsDown(key), nil
+}
+
 var constants map[string]interface{} = map[string]interface{}{
+	// directions
+	"DirW":    float64(shapes.DIR_W),
+	"DirSW":   float64(shapes.DIR_SW),
+	"DirS":    float64(shapes.DIR_S),
+	"DirSE":   float64(shapes.DIR_SE),
+	"DirE":    float64(shapes.DIR_E),
+	"DirNE":   float64(shapes.DIR_NE),
+	"DirN":    float64(shapes.DIR_N),
+	"DirNW":   float64(shapes.DIR_NW),
+	"DirNone": float64(shapes.DIR_NONE),
 	// keyboard keys
 	"KeyUnknown":      float64(glfw.KeyUnknown),
 	"KeySpace":        float64(glfw.KeySpace),
@@ -195,11 +265,18 @@ var constants map[string]interface{} = map[string]interface{}{
 
 func InitScript() {
 	bscript.AddBuiltin("isPressed", isPressed)
+	bscript.AddBuiltin("isDown", isDown)
 	bscript.AddBuiltin("getPosition", getPosition)
 	bscript.AddBuiltin("eraseShape", eraseShape)
 	bscript.AddBuiltin("setShape", setShape)
 	bscript.AddBuiltin("getShape", getShape)
+	bscript.AddBuiltin("setAnimation", setAnimation)
+	bscript.AddBuiltin("setOffset", setOffset)
+	bscript.AddBuiltin("findTopFit", findTopFit)
+	bscript.AddBuiltin("moveViewTo", moveViewTo)
+	bscript.AddBuiltin("setViewScroll", setViewScroll)
 	bscript.AddBuiltin("print", print)
+	bscript.AddBuiltin("getDir", getDir)
 	for k, v := range constants {
 		bscript.AddConstant(k, v)
 	}

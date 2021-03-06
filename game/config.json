@@ -8,11 +8,7 @@
             "resolution": [ 1024, 768 ]
         },
         "runner": {
-            "resolution": [ 400, 300 ],
-            "speed": 50,
-            "player": "man",
-            "start": [976, 1028],
-            "playerSpeed": 0.085
+            "resolution": [ 400, 300 ]
         }        
     },
     "view": {
