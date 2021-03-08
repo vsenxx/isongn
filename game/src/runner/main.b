@@ -18,28 +18,28 @@ const PLAYER_SPEED = 0.085;
 
 const PLAYER_SHAPE = "man";
 
-
+# called on every frame
 def events(delta) {
     animationType := "stand";
-	dx := 0;
-	dy := 0;
-	if(isDown(KeyA) || isDown(KeyLeft)) {
-		dx := 1;
-	}
-	if(isDown(KeyD) || isDown(KeyRight)) {
-		dx := -1;
-	}
-	if(isDown(KeyW) || isDown(KeyUp)) {
-		dy := -1;
-	}
-	if(isDown(KeyS) || isDown(KeyDown)) {
-		dy := 1;
-	}
+    dx := 0;
+    dy := 0;
+    if(isDown(KeyA) || isDown(KeyLeft)) {
+        dx := 1;
+    }
+    if(isDown(KeyD) || isDown(KeyRight)) {
+        dx := -1;
+    }
+    if(isDown(KeyW) || isDown(KeyUp)) {
+        dy := -1;
+    }
+    if(isDown(KeyS) || isDown(KeyDown)) {
+        dy := 1;
+    }
 
     if(dx != 0 || dy != 0) {
-		animationType := "move";
-		playerMove(dx, dy, delta);
-	}
+        animationType := "move";
+        playerMove(dx, dy, delta);
+    }
 
     if(isPressed(KeySpace)) {
         if(findShapeNearby("door.wood.y", (x,y,z) => replaceShape(x, y, z, "door.wood.x")) = false) {
@@ -49,7 +49,7 @@ def events(delta) {
         }
     }
 
-	setAnimation(player.x, player.y, player.z, animationType, player.dir);
+    setAnimation(player.x, player.y, player.z, animationType, player.dir);
 }
 
 def playerMove(dx, dy, delta) {
@@ -73,45 +73,46 @@ def playerMove(dx, dy, delta) {
 }
 
 def playerMoveDir(dx, dy, delta) {
-	oldX := player.x;
-	oldY := player.y;
-	oldZ := player.z;
-	player.dir := getDir(dx, dy);
-	moved := true;
+    oldX := player.x;
+    oldY := player.y;
+    oldZ := player.z;
+    player.dir := getDir(dx, dy);
+    moved := true;
 
-	# adjust speed for diagonal movement... maybe this should be computed from iso angles?
-	speed := PLAYER_SPEED;
-	if(dx != 0 && dy != 0) {
-		speed := PLAYER_SPEED * 1.5;
-	}
-	newXf := player.x + player.scrollOffsetX + (dx * delta / speed);
-	newYf := player.y + player.scrollOffsetY + (dy * delta / speed);
-	newX := int(newXf + 0.5);
-	newY := int(newYf + 0.5);
+    # adjust speed for diagonal movement... maybe this should be computed from iso angles?
+    speed := PLAYER_SPEED;
+    if(dx != 0 && dy != 0) {
+        speed := PLAYER_SPEED * 1.5;
+    }
+    newXf := player.x + player.scrollOffsetX + (dx * delta / speed);
+    newYf := player.y + player.scrollOffsetY + (dy * delta / speed);
+    newX := int(newXf + 0.5);
+    newY := int(newYf + 0.5);
 
-	if(newX != oldX || newY != oldY) {
-		eraseShape(oldX, oldY, oldZ);
-		newZ := findTopFit(newX, newY, PLAYER_SHAPE);
-		if(newZ <= player.z + 1 && inspectUnder(newX, newY, newZ)) {
-			moveViewTo(newX, newY);
+    if(newX != oldX || newY != oldY) {
+        eraseShape(oldX, oldY, oldZ);
+        newZ := findTopFit(newX, newY, PLAYER_SHAPE);
+        if(newZ <= player.z + 1 && inspectUnder(newX, newY, newZ)) {
+            moveViewTo(newX, newY);
 
             player.x := newX;
             player.y := newY;
-			player.z := newZ;
-		} else {
-			# player is blocked
-			moved := false;
-		}
-		setShape(player.x, player.y, player.z, PLAYER_SHAPE);
-	}
+            player.z := newZ;
+        } else {
+            # player is blocked
+            moved := false;
+        }
+        setShape(player.x, player.y, player.z, PLAYER_SHAPE);
+    }
 
     if(moved) {
-		player.scrollOffsetX := newXf - newX;
-		player.scrollOffsetY := newYf - newY;
-		setViewScroll(player.scrollOffsetX, player.scrollOffsetY);
-		setOffset(player.x, player.y, player.z, player.scrollOffsetX, player.scrollOffsetY);
+        # pixel scrolling
+        player.scrollOffsetX := newXf - newX;
+        player.scrollOffsetY := newYf - newY;
+        setViewScroll(player.scrollOffsetX, player.scrollOffsetY);
+        setOffset(player.x, player.y, player.z, player.scrollOffsetX, player.scrollOffsetY);
     }
-	return moved;
+    return moved;
 }
 
 def inspectUnder(x, y, z) {

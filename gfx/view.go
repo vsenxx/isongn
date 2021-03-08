@@ -268,7 +268,7 @@ func (b *Block) vertices() []float32 {
 	points := []float32{
 		w, 0, d, f, (w - f) / ty,
 		w, 0, 0, f, (w + d) / ty,
-		w, h, 0, h / tx, 1,
+		w, h, 0, h / tx, 1 - f,
 		0, h, 0, 1 - f, (h + d) / ty,
 		0, h, d, 1 - f, (h - f) / ty,
 		0, 0, d, w / tx, f,
@@ -653,7 +653,7 @@ in vec2 fragTexCoord;
 layout(location = 0) out vec4 outputColor;
 void main() {
 	vec4 val = texture(tex, fragTexCoord);
-	if (val.a > 0.5) {
+	if (val.a > 0.7) {
 		outputColor = val;
 	} else {
 		discard;

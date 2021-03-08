@@ -117,7 +117,7 @@ func appendShape(index int, name string, shapeDef map[string]interface{}, imageI
 
 	// fudge
 	fudge64, ok := shapeDef["fudge"].(float64)
-	var fudge float32 = 0.01
+	var fudge float32 = 0
 	if ok {
 		fudge = float32(fudge64)
 	}
