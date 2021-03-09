@@ -47,6 +47,7 @@ type View struct {
 	modelUniform         int32
 	textureUniform       int32
 	textureOffsetUniform int32
+	alphaMinUniform      int32
 	viewScrollUniform    int32
 	modelScrollUniform   int32
 	vertAttrib           uint32
@@ -109,6 +110,7 @@ func InitView(zoom float64, camera, shear [3]float32, loader *world.Loader) *Vie
 	view.modelScrollUniform = gl.GetUniformLocation(view.program, gl.Str("modelScroll\x00"))
 	view.textureUniform = gl.GetUniformLocation(view.program, gl.Str("tex\x00"))
 	view.textureOffsetUniform = gl.GetUniformLocation(view.program, gl.Str("textureOffset\x00"))
+	view.alphaMinUniform = gl.GetUniformLocation(view.program, gl.Str("alphaMin\x00"))
 	gl.BindFragDataLocation(view.program, 0, gl.Str("outputColor\x00"))
 	view.vertAttrib = uint32(gl.GetAttribLocation(view.program, gl.Str("vert\x00")))
 	view.texCoordAttrib = uint32(gl.GetAttribLocation(view.program, gl.Str("vertTexCoord\x00")))
@@ -585,6 +587,7 @@ func (b *BlockPos) Draw(view *View) {
 	}
 	gl.UniformMatrix4fv(view.modelUniform, 1, false, &b.model[0])
 	gl.Uniform2fv(view.modelScrollUniform, 1, &b.ScrollOffset[0])
+	gl.Uniform1f(view.alphaMinUniform, b.block.shape.AlphaMin)
 
 	animated := false
 	if b.dir != shapes.DIR_NONE {
@@ -649,14 +652,14 @@ void main() {
 var fragmentShader = `
 #version 330
 uniform sampler2D tex;
+uniform float alphaMin;
 in vec2 fragTexCoord;
 layout(location = 0) out vec4 outputColor;
 void main() {
 	vec4 val = texture(tex, fragTexCoord);
-	if (val.a > 0.7) {
-		outputColor = val;
-	} else {
+	if (val.a < alphaMin) {
 		discard;
 	}
+	outputColor = val;
 }
 ` + "\x00"

@@ -37,6 +37,8 @@ type Animation struct {
 	Tex   map[Direction][]*TextureCoords
 }
 
+const alphaMinDefault = 0.35
+
 type Shape struct {
 	Index         int
 	Name          string
@@ -44,6 +46,7 @@ type Shape struct {
 	Size          [3]float32
 	Tex           *TextureCoords
 	Fudge         float32
+	AlphaMin      float32
 	ImageIndex    int
 	ShapeMeta     *ShapeMeta
 	Edges         map[string]map[string][]*Shape
@@ -122,6 +125,13 @@ func appendShape(index int, name string, shapeDef map[string]interface{}, imageI
 		fudge = float32(fudge64)
 	}
 
+	// alphaMin
+	alphaMin64, ok := shapeDef["alphaMin"].(float64)
+	var alphaMin float32 = alphaMinDefault
+	if ok {
+		alphaMin = float32(alphaMin64)
+	}
+
 	// offset
 	offset := [3]float32{}
 	if offsetI, ok := shapeDef["offset"].([]interface{}); ok {
@@ -137,6 +147,7 @@ func appendShape(index int, name string, shapeDef map[string]interface{}, imageI
 		px, py, pw, ph,
 		img,
 		fudge,
+		alphaMin,
 		imageIndex,
 		shapeMeta,
 		offset,
@@ -212,13 +223,14 @@ func findShape(name string) *Shape {
 	panic("Can't find shape: " + name)
 }
 
-func newShape(index int, name string, size [3]float32, px, py, pw, ph float32, img image.Image, fudge float32, imageIndex int, shapeMeta *ShapeMeta, offset [3]float32) *Shape {
+func newShape(index int, name string, size [3]float32, px, py, pw, ph float32, img image.Image, fudge, alphaMin float32, imageIndex int, shapeMeta *ShapeMeta, offset [3]float32) *Shape {
 	shape := &Shape{
 		Index:      index,
 		Name:       name,
 		Size:       size,
 		Tex:        NewTextureCoords(img.Bounds(), px, py, pw, ph),
 		Fudge:      fudge,
+		AlphaMin:   alphaMin,
 		ImageIndex: imageIndex,
 		ShapeMeta:  shapeMeta,
 		Edges:      map[string]map[string][]*Shape{},
@@ -267,6 +279,7 @@ func InitCreatures(gameDir string, data []map[string]interface{}) error {
 			Size:       size,
 			ImageIndex: imageIndex,
 			Animations: map[int]*Animation{},
+			AlphaMin:   alphaMinDefault,
 		}
 
 		// add a gap, if needed

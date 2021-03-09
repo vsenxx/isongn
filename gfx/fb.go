@@ -126,14 +126,10 @@ uniform sampler2D tex;
 in vec2 fragTexCoord;
 layout(location = 0) out vec4 outputColor;
 void main() {
-	// vec4 val = texture(tex, fragTexCoord);
-	// outputColor = val;
 	vec4 val = texture(tex, fragTexCoord);
-	if (val.a > 0.5) {
-		outputColor = val;
-	} else {
+	if (val.a < 0.1) {
 		discard;
 	}
-	// outputColor = texture(tex, fragTexCoord);
+	outputColor = val;
 }
 ` + "\x00"
