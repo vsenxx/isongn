@@ -8,6 +8,37 @@ import (
 	"github.com/uzudil/isongn/shapes"
 )
 
+func intersectsShapes(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+	x := int(arg[0].(float64))
+	y := int(arg[1].(float64))
+	z := int(arg[2].(float64))
+	nameA := arg[3].(string)
+	nameB := arg[4].(string)
+	shapeA := shapes.Shapes[shapes.Names[nameA]]
+	shapeB := shapes.Shapes[shapes.Names[nameB]]
+
+	app := ctx.App["app"].(*App)
+
+	if intersects(x, x+int(shapeA.Size[0]), app.Loader.X, app.Loader.X+int(shapeB.Size[0])) &&
+		intersects(y, y+int(shapeA.Size[1]), app.Loader.Y, app.Loader.Y+int(shapeB.Size[1])) &&
+		intersects(z, z+int(shapeA.Size[2]), app.Game.GetZ(), app.Game.GetZ()+int(shapeB.Size[2])) {
+		return true, nil
+	}
+	return false, nil
+}
+
+func intersects(start, end, start2, end2 int) bool {
+	return (end2 <= start || start2 >= end) == false
+}
+
+func setMaxZ(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+	if f, ok := arg[0].(float64); ok {
+		app := ctx.App["app"].(*App)
+		app.View.SetMaxZ(int(f))
+	}
+	return nil, nil
+}
+
 func print(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	fmt.Println(arg[0].(string))
 	return nil, nil
@@ -62,13 +93,13 @@ func setAnimation(ctx *bscript.Context, arg ...interface{}) (interface{}, error)
 	return nil, nil
 }
 
-func findTopFit(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+func fits(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	x := int(arg[0].(float64))
 	y := int(arg[1].(float64))
-	name := arg[2].(string)
+	z := int(arg[2].(float64))
+	name := arg[3].(string)
 	app := ctx.App["app"].(*App)
-	newZ := app.View.FindTopFit(x, y, shapes.Shapes[shapes.Names[name]])
-	return float64(newZ), nil
+	return app.View.Fits(x, y, z, shapes.Shapes[shapes.Names[name]]), nil
 }
 
 func moveViewTo(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
@@ -264,6 +295,8 @@ var constants map[string]interface{} = map[string]interface{}{
 }
 
 func InitScript() {
+	bscript.AddBuiltin("intersectsShapes", intersectsShapes)
+	bscript.AddBuiltin("setMaxZ", setMaxZ)
 	bscript.AddBuiltin("isPressed", isPressed)
 	bscript.AddBuiltin("isDown", isDown)
 	bscript.AddBuiltin("getPosition", getPosition)
@@ -272,7 +305,7 @@ func InitScript() {
 	bscript.AddBuiltin("getShape", getShape)
 	bscript.AddBuiltin("setAnimation", setAnimation)
 	bscript.AddBuiltin("setOffset", setOffset)
-	bscript.AddBuiltin("findTopFit", findTopFit)
+	bscript.AddBuiltin("fits", fits)
 	bscript.AddBuiltin("moveViewTo", moveViewTo)
 	bscript.AddBuiltin("setViewScroll", setViewScroll)
 	bscript.AddBuiltin("print", print)

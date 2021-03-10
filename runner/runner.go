@@ -1,6 +1,8 @@
 package runner
 
 import (
+	"path/filepath"
+
 	"github.com/uzudil/bscript/bscript"
 	"github.com/uzudil/isongn/gfx"
 )
@@ -20,10 +22,33 @@ func (runner *Runner) Init(app *gfx.App, config map[string]interface{}) {
 	runner.app = app
 
 	// register some runner-specific callbacks and init bscript
-	runner.ctx = InitScript(app)
+	runner.ctx = initScript(app)
 
 	runner.deltaArg = &bscript.Value{Number: &bscript.SignedNumber{}}
 	runner.eventsCall = gfx.NewFunctionCall("events", runner.deltaArg)
+}
+
+func initScript(app *gfx.App) *bscript.Context {
+
+	// compile the editor script code
+	ast, ctx, err := bscript.Build(
+		filepath.Join(app.Config.GameDir, "src", "runner"),
+		false,
+		map[string]interface{}{
+			"app": app,
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	// run the main method
+	_, err = ast.Evaluate(ctx)
+	if err != nil {
+		panic(err)
+	}
+
+	return ctx
 }
 
 func (runner *Runner) Name() string {

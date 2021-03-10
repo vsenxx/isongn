@@ -10,6 +10,15 @@ def editorCommand() {
         setShape(pos[0], pos[1], pos[2], "plant.trunk");
         setShape(pos[0] - 1, pos[1] - 1, pos[2] + 4, choose(TREES));
     }
+    if(isPressed(Key0)) {
+        setMaxZ(24);
+    }
+    if(isPressed(Key1)) {
+        setMaxZ(7);
+    }
+    if(isPressed(Key2)) {
+        setMaxZ(14);
+    }
 }
 
 def main() {

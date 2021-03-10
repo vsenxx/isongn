@@ -1,10 +1,10 @@
 # isongn (iso-engine)
 
-![alt text](images/screen1.png "Title")
+![alt text](images/anim.gif "Title")
 
 ## What is it?
 
-isongn is a cross-platform, open-world, isometric tile editor and game runner. Realize your old-school rpg/action-game dreams with easy-to-use modern technology!
+isongn is a cross-platform, open-world, isometric, scriptable rendering engine. We take care of disk io, graphics, sound, collision detection and map abstractions. You provide the assets, event handling scripts and the vision. Realize your old-school rpg/action-game dreams with easy-to-use modern technology!
 
 ## The tech
 
@@ -12,16 +12,12 @@ For graphics, isongn uses opengl. Instead of sorting isometric shapes [using the
 
 isongn is written in Go with minimal dependencies so it should run on all platforms.
 
+For scripting, isongn uses [bscript](https://github.com/uzudil/bscript). The language is [similar](https://github.com/uzudil/benji4000/wiki/LanguageFeatures) to modern JavaScript.
+
 ## How to use isongn
 
-Please see the [User Guide](https://github.com/uzudil/isongn/wiki/Isongn-User-Guide) about how to use isongn to make your own games.
+You can create games without writing any golang code. With a single config file and your assets in a dir, you're ready to set the retro gaming scene on [fire](https://uzudil.itch.io/the-curse-of-svaltfen)!
 
-## Plans!
-
-Currently only a basic editor is supported however, coming soon I plan to add:
-- sound support
-- scripting support (you will be able to make games without any golang code)
-- creatures/animated blocks
-- intelligent/scripted editor (walls/beaches/etc)
+Please see the [User Guide](https://github.com/uzudil/isongn/wiki/Isongn-User-Guide) for more info about how to make your own games.
 
 2021 (c) Gabor Torok, MIT License

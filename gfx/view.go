@@ -363,15 +363,6 @@ func (view *View) GetShape(worldX, worldY, worldZ int) (int, int, int, int, bool
 	return b.block.shape.Index, originWorldX, originWorldY, originWorldZ, true
 }
 
-func (view *View) FindTopFit(worldX, worldY int, shape *shapes.Shape) int {
-	for z := 0; z < world.SECTION_Z_SIZE; z++ {
-		if view.Fits(worldX, worldY, z, shape) {
-			return z
-		}
-	}
-	return 0
-}
-
 func (view *View) Fits(worldX, worldY, worldZ int, shape *shapes.Shape) bool {
 	fits := true
 	shape.Traverse(func(x, y, z int) bool {
@@ -392,7 +383,7 @@ func (view *View) FindTop(worldX, worldY int, shape *shapes.Shape) int {
 	maxZ := 0
 	for x := 0; x < int(shape.Size[0]); x++ {
 		for y := 0; y < int(shape.Size[1]); y++ {
-			for z := world.SECTION_Z_SIZE - 1; z >= 0; z-- {
+			for z := view.maxZ - 1; z >= 0; z-- {
 				_, _, _, _, found := view.GetShape(worldX+x, worldY+y, z)
 				if found && z+1 > maxZ {
 					maxZ = z + 1

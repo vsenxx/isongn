@@ -158,14 +158,6 @@ def copy_array(m) {
     return array_reduce(m, [], (d, e) => { d[len(d)] := e; return d; });
 }
 
-def isKeyPress(key) {
-    if(isKeyDown(key)) {
-        while(isKeyDown(key)) {}
-        return true;
-    }
-    return false;
-}
-
 def range(start, end, step, fx) {
     i := start;
     while(i < end) {
@@ -176,20 +168,4 @@ def range(start, end, step, fx) {
 
 def asPercent(n) {
     return round(n * 100);
-}
-
-def isLeftMove() {
-    return isKeyDown(KeyLeft) || isKeyDown(KeyA);
-}
-
-def isRightMove() {
-    return isKeyDown(KeyRight) || isKeyDown(KeyD);
-}
-
-def isUpMove() {
-    return isKeyDown(KeyUp) || isKeyDown(KeyW);
-}
-
-def isDownMove() {
-    return isKeyDown(KeyDown) || isKeyDown(KeyS);
 }

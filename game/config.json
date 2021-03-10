@@ -144,7 +144,16 @@
                 { "name": "hay.x", "size": [ 6, 2, 3], "pos": [264, 96] },
                 { "name": "chimney.y", "size": [ 1, 3, 10], "pos": [344, 88] },
                 { "name": "barrel.y", "size": [ 2, 3, 3], "pos": [384, 104] },
-                { "name": "bar.y", "size": [ 2, 5, 4], "pos": [432, 96] }
+                { "name": "bar.y", "size": [ 2, 5, 4], "pos": [432, 96] },
+
+                { "name": "floor.stone", "size": [ 9, 9, 1], "pos": [576, 0] },
+                { "name": "floor.stone.x", "size": [ 9, 4, 1], "pos": [728, 8] },
+                { "name": "floor.stone.strip.x", "size": [ 9, 1, 1], "pos": [840, 8] },
+                { "name": "floor.stone.strip.y", "size": [ 1, 4, 1], "pos": [936, 8] },
+                { "name": "floor.stone.small.1", "size": [ 6, 4, 1], "pos": [560, 160] },
+                { "name": "floor.stone.small.2", "size": [ 4, 6, 1], "pos": [648, 160] },
+                { "name": "floor.stone.small.3", "size": [ 2, 6, 1], "pos": [728, 160] },
+                { "name": "floor.stone.small.3", "size": [ 6, 2, 1], "pos": [808, 160] }
             ]
         },
         {
@@ -155,7 +164,7 @@
             "dpi": 288,
             "shapes": [
                 { "name": "roof.lattice", "size": [ 10, 10, 1], "pos": [392, 120] },
-                
+
                 { "name": "roof.gray.sw", "size": [ 6, 6, 6], "pos": [0, 464], "alphaMin": 0.75 },
                 { "name": "roof.gray.nw", "size": [ 6, 6, 6], "pos": [96, 464], "alphaMin": 0.75 },
                 { "name": "roof.gray.ne", "size": [ 6, 6, 6], "pos": [192, 464], "alphaMin": 0.75 },

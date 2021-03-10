@@ -73,9 +73,6 @@ def playerMove(dx, dy, delta) {
 }
 
 def playerMoveDir(dx, dy, delta) {
-    oldX := player.x;
-    oldY := player.y;
-    oldZ := player.z;
     player.dir := getDir(dx, dy);
     moved := true;
 
@@ -89,15 +86,30 @@ def playerMoveDir(dx, dy, delta) {
     newX := int(newXf + 0.5);
     newY := int(newYf + 0.5);
 
-    if(newX != oldX || newY != oldY) {
-        eraseShape(oldX, oldY, oldZ);
-        newZ := findTopFit(newX, newY, PLAYER_SHAPE);
-        if(newZ <= player.z + 1 && inspectUnder(newX, newY, newZ)) {
+    if(newX != player.x || newY != player.y) {
+        eraseShape(player.x, player.y, player.z);
+
+        # find the new z coord
+        newZ := -1;
+        if(fits(newX, newY, player.z, PLAYER_SHAPE)) {
+            newZ := player.z;
+        } else {
+            # step up if you can
+            if(fits(newX, newY, player.z + 1, PLAYER_SHAPE)) {
+                newZ := player.z + 1;
+            }
+        }
+
+        if(newZ > 0 && newZ <= player.z + 1 && inspectUnder(newX, newY, newZ)) {
+            # drop down
+            while(newZ > 0 && standOnShape(newX, newY, newZ) = false) {
+                newZ := newZ - 1;
+            }
             moveViewTo(newX, newY);
 
             player.x := newX;
             player.y := newY;
-            player.z := newZ;
+            player.z := newZ;            
         } else {
             # player is blocked
             moved := false;
@@ -113,6 +125,14 @@ def playerMoveDir(dx, dy, delta) {
         setOffset(player.x, player.y, player.z, player.scrollOffsetX, player.scrollOffsetY);
     }
     return moved;
+}
+
+def standOnShape(x, y, z) {
+    found := [false];
+    findShapeUnder(x, y, z, info => {
+        found[0] := true;
+    });
+    return found[0];
 }
 
 def inspectUnder(x, y, z) {
@@ -186,7 +206,7 @@ def isUnderRoof() {
         if(info = null) {
             found[0] := false;
         } else {
-            if(substr(info[0], 0, 5) != "roof.") {
+            if(substr(info[0], 0, 5) != "roof." && substr(info[0], 0, 6) != "floor.") {
                 found[0] := false;
             }
         }
