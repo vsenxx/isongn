@@ -37,6 +37,7 @@ func NewEditor() *Editor {
 
 func (e *Editor) Init(app *gfx.App, config map[string]interface{}) {
 	e.app = app
+	e.app.Loader.SetIoMode(world.EDITOR_MODE)
 	e.app.View.Load()
 
 	// compile the editor script code

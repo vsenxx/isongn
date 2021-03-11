@@ -5,6 +5,7 @@ import (
 
 	"github.com/uzudil/bscript/bscript"
 	"github.com/uzudil/isongn/gfx"
+	"github.com/uzudil/isongn/world"
 )
 
 type Runner struct {
@@ -20,6 +21,7 @@ func NewRunner() *Runner {
 
 func (runner *Runner) Init(app *gfx.App, config map[string]interface{}) {
 	runner.app = app
+	runner.app.Loader.SetIoMode(world.RUNNER_MODE)
 
 	// register some runner-specific callbacks and init bscript
 	runner.ctx = initScript(app)

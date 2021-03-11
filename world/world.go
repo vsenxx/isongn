@@ -14,8 +14,9 @@ import (
 const (
 	SECTION_SIZE   = 200
 	SECTION_Z_SIZE = 24
-	STAMP_SIZE     = 8
 	VERSION        = 1
+	EDITOR_MODE    = 0
+	RUNNER_MODE    = 1
 )
 
 type Point struct {
@@ -42,13 +43,19 @@ func NewSectionCache() *SectionCache {
 }
 
 type Loader struct {
-	dir          string
+	userDir      string
+	gameDir      string
 	X, Y         int
 	sectionCache *SectionCache
+	ioMode       int
 }
 
-func NewLoader(dir string, x, y int) *Loader {
-	return &Loader{dir, x, y, NewSectionCache()}
+func NewLoader(userDir, gameDir string) *Loader {
+	return &Loader{userDir, gameDir, 5000, 5000, NewSectionCache(), EDITOR_MODE}
+}
+
+func (loader *Loader) SetIoMode(mode int) {
+	loader.ioMode = mode
 }
 
 func (loader *Loader) MoveTo(x, y int) bool {
@@ -174,8 +181,22 @@ func (loader *Loader) load(sx, sy int) (*Section, error) {
 		X: sx,
 		Y: sy,
 	}
-	path := loader.getPath(sx, sy)
+
+	mapName := fmt.Sprintf("map%02x%02x", sx, sy)
+	var path string
+	if loader.ioMode == EDITOR_MODE {
+		// the editor io is always from the game dir
+		path = filepath.Join(loader.gameDir, "maps", mapName)
+	} else {
+		// the runner io tries from user dir
+		path = filepath.Join(loader.userDir, mapName)
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			// and if that fails, from game dir
+			path = filepath.Join(loader.gameDir, "maps", mapName)
+		}
+	}
 	fmt.Printf("Looking for section: %s\n", path)
+
 	if _, err := os.Stat(path); err == nil {
 		defer un(trace("Loading map"))
 		fmt.Printf("Loading section: %s bytes: %d\n", path, unsafe.Sizeof(section.position))
@@ -215,8 +236,18 @@ func (loader *Loader) load(sx, sy int) (*Section, error) {
 
 func (loader *Loader) save(section *Section) error {
 	defer un(trace("Saving map"))
-	path := loader.getPath(section.X, section.Y)
+
+	mapName := fmt.Sprintf("map%02x%02x", section.X, section.Y)
+	var path string
+	if loader.ioMode == EDITOR_MODE {
+		// the editor io is always to the game dir
+		path = filepath.Join(loader.gameDir, "maps", mapName)
+	} else {
+		// the runner io always to user dir
+		path = filepath.Join(loader.userDir, mapName)
+	}
 	fmt.Printf("Writing section: %s\n", path)
+
 	f, err := os.Create(path)
 	if err != nil {
 		return err
@@ -239,10 +270,6 @@ func (loader *Loader) save(section *Section) error {
 	}
 
 	return nil
-}
-
-func (loader *Loader) getPath(sx, sy int) string {
-	return filepath.Join(loader.dir, fmt.Sprintf("map%02x%02x", sx, sy))
 }
 
 func trace(s string) (string, time.Time) {

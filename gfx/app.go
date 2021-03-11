@@ -69,6 +69,11 @@ type App struct {
 }
 
 func NewApp(game Game, gameDir string, windowWidth, windowHeight int, targetFps float64) *App {
+	// make sure the ./game/maps dir exists
+	mapDir := filepath.Join(gameDir, "maps")
+	if _, err := os.Stat(mapDir); os.IsNotExist(err) {
+		os.Mkdir(mapDir, os.ModePerm)
+	}
 	appConfig := parseConfig(gameDir)
 	width, height := getResolution(appConfig, game.Name())
 	app := &App{
@@ -107,7 +112,7 @@ func NewApp(game Game, gameDir string, windowWidth, windowHeight int, targetFps 
 	if err != nil {
 		panic(err)
 	}
-	app.Loader = world.NewLoader(app.Dir, 1000, 1000)
+	app.Loader = world.NewLoader(app.Dir, gameDir)
 	app.View = InitView(appConfig.zoom, appConfig.camera, appConfig.shear, app.Loader)
 	app.Ui = InitUi(width, height)
 	return app
