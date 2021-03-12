@@ -43,6 +43,7 @@ func NewSectionCache() *SectionCache {
 }
 
 type Loader struct {
+	observer     WorldObserver
 	userDir      string
 	gameDir      string
 	X, Y         int
@@ -50,8 +51,13 @@ type Loader struct {
 	ioMode       int
 }
 
-func NewLoader(userDir, gameDir string) *Loader {
-	return &Loader{userDir, gameDir, 5000, 5000, NewSectionCache(), EDITOR_MODE}
+type WorldObserver interface {
+	SectionLoad(x, y int)
+	SectionSave(x, y int)
+}
+
+func NewLoader(observer WorldObserver, userDir, gameDir string) *Loader {
+	return &Loader{observer, userDir, gameDir, 5000, 5000, NewSectionCache(), EDITOR_MODE}
 }
 
 func (loader *Loader) SetIoMode(mode int) {
@@ -145,7 +151,9 @@ func (loader *Loader) getSection(sx, sy int) (*Section, error) {
 
 	// save version in cache
 	if loader.sectionCache.cache[oldestIndex] != nil {
-		err := loader.save(loader.sectionCache.cache[oldestIndex])
+		oldSection := loader.sectionCache.cache[oldestIndex]
+		loader.observer.SectionSave(oldSection.X, oldSection.Y)
+		err := loader.save(oldSection)
 		if err != nil {
 			return nil, err
 		}
@@ -160,6 +168,8 @@ func (loader *Loader) getSection(sx, sy int) (*Section, error) {
 	// put in cache
 	loader.sectionCache.cache[oldestIndex] = section
 	loader.sectionCache.times[oldestIndex] = time.Now().Unix()
+
+	loader.observer.SectionLoad(sx, sy)
 
 	return section, nil
 }
@@ -182,7 +192,7 @@ func (loader *Loader) load(sx, sy int) (*Section, error) {
 		Y: sy,
 	}
 
-	mapName := fmt.Sprintf("map%02x%02x", sx, sy)
+	mapName := mapFileName(sx, sy)
 	var path string
 	if loader.ioMode == EDITOR_MODE {
 		// the editor io is always from the game dir
@@ -237,7 +247,7 @@ func (loader *Loader) load(sx, sy int) (*Section, error) {
 func (loader *Loader) save(section *Section) error {
 	defer un(trace("Saving map"))
 
-	mapName := fmt.Sprintf("map%02x%02x", section.X, section.Y)
+	mapName := mapFileName(section.X, section.Y)
 	var path string
 	if loader.ioMode == EDITOR_MODE {
 		// the editor io is always to the game dir
@@ -280,4 +290,8 @@ func trace(s string) (string, time.Time) {
 func un(s string, startTime time.Time) {
 	endTime := time.Now()
 	log.Println("  END:", s, "ElapsedTime in seconds:", endTime.Sub(startTime))
+}
+
+func mapFileName(sx, sy int) string {
+	return fmt.Sprintf("map%02x%02x", sx, sy)
 }

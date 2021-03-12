@@ -35,6 +35,7 @@ type BlockPos struct {
 	animationTimer float64
 	animationType  int
 	animationStep  int
+	animationSpeed float64
 	ScrollOffset   [2]float32
 }
 
@@ -61,12 +62,13 @@ type View struct {
 	zoom                 float64
 	shear                [3]float32
 	Cursor               *BlockPos
-	ScrollOffset         [2]float32
+	ScrollOffset         [3]float32
 	maxZ                 int
 }
 
 const viewSize = 10
 const SIZE = 64
+const VIEW_BORDER = 8
 
 func getProjection(zoom float32, shear [3]float32) mgl32.Mat4 {
 	projection := mgl32.Ortho(-viewSize*zoom*0.95, viewSize*zoom*0.95, -viewSize*zoom*0.95, viewSize*zoom*0.95, -viewSize*zoom*2, viewSize*zoom*2)
@@ -310,6 +312,8 @@ func (view *View) Load() {
 	view.traverse(func(x, y, z int) {
 		blockPos := view.blockPos[x][y][z]
 		blockPos.block = nil
+		blockPos.ScrollOffset[0] = 0
+		blockPos.ScrollOffset[1] = 0
 		view.origins[x][y][z] = nil
 
 		if z == 0 {
@@ -341,6 +345,11 @@ func (view *View) toViewPos(worldX, worldY, worldZ int) (int, int, int, bool) {
 	viewY := worldY - (view.Loader.Y - SIZE/2)
 	invalidPos := viewX < 0 || viewX >= SIZE || viewY < 0 || viewY >= SIZE || worldZ < 0 || worldZ >= world.SECTION_Z_SIZE
 	return viewX, viewY, worldZ, !invalidPos
+}
+
+func (view *View) Inside(worldX, worldY int) bool {
+	vx, vy, _, validPos := view.toViewPos(worldX, worldY, 1)
+	return validPos && vx >= VIEW_BORDER && vx < SIZE-VIEW_BORDER && vy >= VIEW_BORDER && vy < SIZE-VIEW_BORDER
 }
 
 func (view *View) InView(worldX, worldY, worldZ int) bool {
@@ -470,11 +479,12 @@ func (view *View) SetOffset(worldX, worldY, worldZ int, dx, dy float32) {
 	}
 }
 
-func (view *View) SetShapeAnimation(worldX, worldY, worldZ int, animationType int, dir shapes.Direction) {
+func (view *View) SetShapeAnimation(worldX, worldY, worldZ int, animationType int, dir shapes.Direction, animationSpeed float64) {
 	blockPos := view.GetBlockPos(worldX, worldY, worldZ)
 	if blockPos != nil {
 		blockPos.dir = dir
 		blockPos.animationType = animationType
+		blockPos.animationSpeed = animationSpeed
 	}
 }
 
@@ -521,9 +531,10 @@ func (view *View) HideCursor() {
 	view.Cursor.block = nil
 }
 
-func (view *View) Scroll(dx, dy float32) {
+func (view *View) Scroll(dx, dy, dz float32) {
 	view.ScrollOffset[0] = dx
 	view.ScrollOffset[1] = dy
+	view.ScrollOffset[2] = dz
 }
 
 type DrawState struct {
@@ -544,7 +555,7 @@ func (view *View) Draw(delta float64) {
 	gl.BindVertexArray(view.vao)
 	gl.EnableVertexAttribArray(view.vertAttrib)
 	gl.EnableVertexAttribArray(view.texCoordAttrib)
-	gl.Uniform2fv(view.viewScrollUniform, 1, &view.ScrollOffset[0])
+	gl.Uniform3fv(view.viewScrollUniform, 1, &view.ScrollOffset[0])
 	state.delta = delta
 	state.init = false
 	view.traverse(func(x, y, z int) {
@@ -600,7 +611,7 @@ func (b *BlockPos) Draw(view *View) {
 func (b *BlockPos) incrAnimationStep(animation *shapes.Animation) {
 	b.animationTimer -= state.delta
 	if b.animationTimer <= 0 {
-		b.animationTimer = 0.05
+		b.animationTimer = b.animationSpeed
 		b.animationStep++
 	}
 	if b.animationStep >= animation.Steps {
@@ -622,7 +633,7 @@ uniform mat4 projection;
 uniform mat4 camera;
 uniform mat4 model;
 uniform float textureOffset;
-uniform vec2 viewScroll;
+uniform vec3 viewScroll;
 uniform vec2 modelScroll;
 in vec3 vert;
 in vec2 vertTexCoord;
@@ -634,7 +645,7 @@ void main() {
 		1.0, 0.0, 0.0, 0.0,
 		0.0, 1.0, 0.0, 0.0,
 		0.0, 0.0, 1.0, 0.0,
-		model[3][0] + modelScroll.x - viewScroll.x, model[3][1] + modelScroll.y - viewScroll.y, model[3][2], 1.0
+		model[3][0] + modelScroll.x - viewScroll.x, model[3][1] + modelScroll.y - viewScroll.y, model[3][2] - viewScroll.z, 1.0
 	);
     gl_Position = projection * camera * modelScroll * vec4(vert, 1);
 }

@@ -112,7 +112,7 @@ func NewApp(game Game, gameDir string, windowWidth, windowHeight int, targetFps 
 	if err != nil {
 		panic(err)
 	}
-	app.Loader = world.NewLoader(app.Dir, gameDir)
+	app.Loader = world.NewLoader(game.(world.WorldObserver), app.Dir, gameDir)
 	app.View = InitView(appConfig.zoom, appConfig.camera, appConfig.shear, app.Loader)
 	app.Ui = InitUi(width, height)
 	return app

@@ -327,7 +327,7 @@ func (e *Editor) infoContents(panel *gfx.Panel) bool {
 	if e.infoUpdate {
 		panel.Clear()
 		sx, sy := e.app.Loader.GetSectionPos()
-		e.app.Font.Printf(panel.Rgba, color.Black, 0, 30, "pos=%d,%d,%d section=%02x%02x", e.app.Loader.X, e.app.Loader.Y, e.Z, sx, sy)
+		e.app.Font.Printf(panel.Rgba, color.Black, 0, 30, "pos=%d,%d,%d section=%d,%d", e.app.Loader.X, e.app.Loader.Y, e.Z, sx, sy)
 		e.infoUpdate = false
 		return true
 	}
@@ -354,4 +354,10 @@ func (e *Editor) shapeSelectorContents(panel *gfx.Panel) bool {
 		return true
 	}
 	return false
+}
+
+func (e *Editor) SectionLoad(x, y int) {
+}
+
+func (e *Editor) SectionSave(x, y int) {
 }

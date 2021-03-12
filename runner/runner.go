@@ -9,10 +9,16 @@ import (
 )
 
 type Runner struct {
-	app        *gfx.App
-	ctx        *bscript.Context
-	eventsCall *bscript.Variable
-	deltaArg   *bscript.Value
+	app             *gfx.App
+	ctx             *bscript.Context
+	eventsCall      *bscript.Variable
+	deltaArg        *bscript.Value
+	sectionLoadCall *bscript.Variable
+	sectionLoadXArg *bscript.Value
+	sectionLoadYArg *bscript.Value
+	sectionSaveCall *bscript.Variable
+	sectionSaveXArg *bscript.Value
+	sectionSaveYArg *bscript.Value
 }
 
 func NewRunner() *Runner {
@@ -22,15 +28,6 @@ func NewRunner() *Runner {
 func (runner *Runner) Init(app *gfx.App, config map[string]interface{}) {
 	runner.app = app
 	runner.app.Loader.SetIoMode(world.RUNNER_MODE)
-
-	// register some runner-specific callbacks and init bscript
-	runner.ctx = initScript(app)
-
-	runner.deltaArg = &bscript.Value{Number: &bscript.SignedNumber{}}
-	runner.eventsCall = gfx.NewFunctionCall("events", runner.deltaArg)
-}
-
-func initScript(app *gfx.App) *bscript.Context {
 
 	// compile the editor script code
 	ast, ctx, err := bscript.Build(
@@ -44,13 +41,24 @@ func initScript(app *gfx.App) *bscript.Context {
 		panic(err)
 	}
 
+	runner.ctx = ctx
+
+	runner.deltaArg = &bscript.Value{Number: &bscript.SignedNumber{}}
+	runner.eventsCall = gfx.NewFunctionCall("events", runner.deltaArg)
+
+	runner.sectionLoadXArg = &bscript.Value{Number: &bscript.SignedNumber{}}
+	runner.sectionLoadYArg = &bscript.Value{Number: &bscript.SignedNumber{}}
+	runner.sectionLoadCall = gfx.NewFunctionCall("onSectionLoad", runner.sectionLoadXArg, runner.sectionLoadYArg)
+
+	runner.sectionSaveXArg = &bscript.Value{Number: &bscript.SignedNumber{}}
+	runner.sectionSaveYArg = &bscript.Value{Number: &bscript.SignedNumber{}}
+	runner.sectionSaveCall = gfx.NewFunctionCall("beforeSectionSave", runner.sectionSaveXArg, runner.sectionSaveYArg)
+
 	// run the main method
 	_, err = ast.Evaluate(ctx)
 	if err != nil {
 		panic(err)
 	}
-
-	return ctx
 }
 
 func (runner *Runner) Name() string {
@@ -64,4 +72,16 @@ func (runner *Runner) Events(delta float64) {
 
 func (runner *Runner) GetZ() int {
 	return 0
+}
+
+func (runner *Runner) SectionLoad(x, y int) {
+	runner.sectionLoadXArg.Number.Number = float64(x)
+	runner.sectionLoadYArg.Number.Number = float64(y)
+	runner.sectionLoadCall.Evaluate(runner.ctx)
+}
+
+func (runner *Runner) SectionSave(x, y int) {
+	runner.sectionSaveXArg.Number.Number = float64(x)
+	runner.sectionSaveYArg.Number.Number = float64(y)
+	runner.sectionSaveCall.Evaluate(runner.ctx)
 }

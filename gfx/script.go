@@ -27,6 +27,13 @@ func intersectsShapes(ctx *bscript.Context, arg ...interface{}) (interface{}, er
 	return false, nil
 }
 
+func isInView(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+	x := int(arg[0].(float64))
+	y := int(arg[1].(float64))
+	app := ctx.App["app"].(*App)
+	return app.View.Inside(x, y), nil
+}
+
 func intersects(start, end, start2, end2 int) bool {
 	return (end2 <= start || start2 >= end) == false
 }
@@ -77,8 +84,9 @@ func setOffset(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 func setViewScroll(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	sx := float32(arg[0].(float64))
 	sy := float32(arg[1].(float64))
+	sz := float32(arg[2].(float64))
 	app := ctx.App["app"].(*App)
-	app.View.Scroll(sx, sy)
+	app.View.Scroll(sx, sy, sz)
 	return nil, nil
 }
 
@@ -88,8 +96,9 @@ func setAnimation(ctx *bscript.Context, arg ...interface{}) (interface{}, error)
 	z := int(arg[2].(float64))
 	name := arg[3].(string)
 	dir := arg[4].(float64)
+	animationSpeed := arg[5].(float64)
 	app := ctx.App["app"].(*App)
-	app.View.SetShapeAnimation(x, y, z, shapes.AnimationNames[name], shapes.Direction(dir))
+	app.View.SetShapeAnimation(x, y, z, shapes.AnimationNames[name], shapes.Direction(dir), animationSpeed)
 	return nil, nil
 }
 
@@ -310,6 +319,7 @@ func InitScript() {
 	bscript.AddBuiltin("setViewScroll", setViewScroll)
 	bscript.AddBuiltin("print", print)
 	bscript.AddBuiltin("getDir", getDir)
+	bscript.AddBuiltin("isInView", isInView)
 	for k, v := range constants {
 		bscript.AddConstant(k, v)
 	}
