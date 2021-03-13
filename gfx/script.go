@@ -70,6 +70,18 @@ func setShape(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	return nil, nil
 }
 
+func moveShape(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+	x := int(arg[0].(float64))
+	y := int(arg[1].(float64))
+	z := int(arg[2].(float64))
+	nx := int(arg[3].(float64))
+	ny := int(arg[4].(float64))
+	nz := int(arg[5].(float64))
+	app := ctx.App["app"].(*App)
+	app.View.MoveShape(x, y, z, nx, ny, nz)
+	return nil, nil
+}
+
 func setOffset(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	x := int(arg[0].(float64))
 	y := int(arg[1].(float64))
@@ -103,12 +115,14 @@ func setAnimation(ctx *bscript.Context, arg ...interface{}) (interface{}, error)
 }
 
 func fits(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
-	x := int(arg[0].(float64))
-	y := int(arg[1].(float64))
-	z := int(arg[2].(float64))
-	name := arg[3].(string)
+	tx := int(arg[0].(float64))
+	ty := int(arg[1].(float64))
+	tz := int(arg[2].(float64))
+	fx := int(arg[3].(float64))
+	fy := int(arg[4].(float64))
+	fz := int(arg[5].(float64))
 	app := ctx.App["app"].(*App)
-	return app.View.Fits(x, y, z, shapes.Shapes[shapes.Names[name]]), nil
+	return app.View.Fits(tx, ty, tz, fx, fy, fz), nil
 }
 
 func moveViewTo(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
@@ -311,6 +325,7 @@ func InitScript() {
 	bscript.AddBuiltin("getPosition", getPosition)
 	bscript.AddBuiltin("eraseShape", eraseShape)
 	bscript.AddBuiltin("setShape", setShape)
+	bscript.AddBuiltin("moveShape", moveShape)
 	bscript.AddBuiltin("getShape", getShape)
 	bscript.AddBuiltin("setAnimation", setAnimation)
 	bscript.AddBuiltin("setOffset", setOffset)
@@ -351,4 +366,77 @@ func NewFunctionCall(functionName string, values ...*bscript.Value) *bscript.Var
 			},
 		},
 	}
+}
+
+var trueValue string = "true"
+var falseValue string = "false"
+
+func toValue(v interface{}) *bscript.Value {
+	value := &bscript.Value{}
+	if f, ok := v.(float64); ok {
+		value.Number = &bscript.SignedNumber{}
+		value.Number.Number = f
+	} else {
+		if s, ok := v.(string); ok {
+			value.String = &s
+		} else {
+			if b, ok := v.(bool); ok {
+				if b {
+					value.Boolean = &trueValue
+				} else {
+					value.Boolean = &falseValue
+				}
+			} else {
+				if a, ok := v.(*([]interface{})); ok {
+					value.Array = &bscript.Array{}
+					for _, e := range *a {
+						expr := toExpression(toValue(e))
+						if value.Array.LeftValue == nil {
+							value.Array.LeftValue = expr
+						} else {
+							value.Array.RightValues = append(value.Array.RightValues, expr)
+						}
+					}
+				} else {
+					if m, ok := v.(map[string]interface{}); ok {
+						value.Map = ToBscriptMap(m)
+					} else {
+						panic(fmt.Sprintf("Don't know how to convert value type: %v", v))
+					}
+				}
+			}
+		}
+	}
+	return value
+}
+
+func toExpression(value *bscript.Value) *bscript.Expression {
+	return &bscript.Expression{
+		BoolTerm: &bscript.BoolTerm{
+			Left: &bscript.Cmp{
+				Left: &bscript.Term{
+					Left: &bscript.Factor{
+						Base: value,
+					},
+				},
+			},
+		},
+	}
+}
+
+func ToBscriptMap(d map[string]interface{}) *bscript.Map {
+	m := &bscript.Map{}
+	for k, v := range d {
+		expr := toExpression(toValue(v))
+		nvp := &bscript.NameValuePair{
+			Name:  k,
+			Value: expr,
+		}
+		if m.LeftNameValuePair == nil {
+			m.LeftNameValuePair = nvp
+		} else {
+			m.RightNameValuePairs = append(m.RightNameValuePairs, nvp)
+		}
+	}
+	return m
 }

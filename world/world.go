@@ -3,18 +3,20 @@ package world
 import (
 	"compress/gzip"
 	"encoding/gob"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"time"
-	"unsafe"
+
+	"github.com/go-gl/glfw/v3.3/glfw"
 )
 
 const (
 	SECTION_SIZE   = 200
 	SECTION_Z_SIZE = 24
-	VERSION        = 1
+	VERSION        = 3
 	EDITOR_MODE    = 0
 	RUNNER_MODE    = 1
 )
@@ -31,11 +33,12 @@ type Section struct {
 	X, Y     int
 	position [SECTION_SIZE][SECTION_SIZE][SECTION_Z_SIZE]Position
 	edges    [SECTION_SIZE][SECTION_SIZE]Position
+	data     map[string]interface{}
 }
 
 type SectionCache struct {
 	cache [4]*Section
-	times [4]int64
+	times [4]float64
 }
 
 func NewSectionCache() *SectionCache {
@@ -52,8 +55,8 @@ type Loader struct {
 }
 
 type WorldObserver interface {
-	SectionLoad(x, y int)
-	SectionSave(x, y int)
+	SectionLoad(x, y int, data map[string]interface{})
+	SectionSave(x, y int) map[string]interface{}
 }
 
 func NewLoader(observer WorldObserver, userDir, gameDir string) *Loader {
@@ -141,7 +144,6 @@ func (loader *Loader) getSection(sx, sy int) (*Section, error) {
 	oldestIndex := -1
 	for i := 0; i < len(loader.sectionCache.cache); i++ {
 		if loader.sectionCache.cache[i] != nil && loader.sectionCache.cache[i].X == sx && loader.sectionCache.cache[i].Y == sy {
-			loader.sectionCache.times[i] = time.Now().Unix()
 			return loader.sectionCache.cache[i], nil
 		}
 		if oldestIndex == -1 || loader.sectionCache.times[i] < loader.sectionCache.times[oldestIndex] {
@@ -152,7 +154,7 @@ func (loader *Loader) getSection(sx, sy int) (*Section, error) {
 	// save version in cache
 	if loader.sectionCache.cache[oldestIndex] != nil {
 		oldSection := loader.sectionCache.cache[oldestIndex]
-		loader.observer.SectionSave(oldSection.X, oldSection.Y)
+		oldSection.data = loader.observer.SectionSave(oldSection.X, oldSection.Y)
 		err := loader.save(oldSection)
 		if err != nil {
 			return nil, err
@@ -167,9 +169,20 @@ func (loader *Loader) getSection(sx, sy int) (*Section, error) {
 
 	// put in cache
 	loader.sectionCache.cache[oldestIndex] = section
-	loader.sectionCache.times[oldestIndex] = time.Now().Unix()
+	loader.sectionCache.times[oldestIndex] = glfw.GetTime()
 
-	loader.observer.SectionLoad(sx, sy)
+	loader.observer.SectionLoad(sx, sy, section.data)
+
+	// fmt.Printf("CACHE: \n")
+	// for i := range loader.sectionCache.cache {
+	// 	section := loader.sectionCache.cache[i]
+	// 	if section == nil {
+	// 		fmt.Printf("\tnil\n")
+	// 	} else {
+	// 		fmt.Printf("\t%d,%d %f\n", section.X, section.Y, loader.sectionCache.times[i])
+	// 	}
+	// }
+	// fmt.Printf("---------------\n")
 
 	return section, nil
 }
@@ -188,8 +201,9 @@ func (loader *Loader) SaveAll() error {
 
 func (loader *Loader) load(sx, sy int) (*Section, error) {
 	section := &Section{
-		X: sx,
-		Y: sy,
+		X:    sx,
+		Y:    sy,
+		data: map[string]interface{}{},
 	}
 
 	mapName := mapFileName(sx, sy)
@@ -205,11 +219,9 @@ func (loader *Loader) load(sx, sy int) (*Section, error) {
 			path = filepath.Join(loader.gameDir, "maps", mapName)
 		}
 	}
-	fmt.Printf("Looking for section: %s\n", path)
 
 	if _, err := os.Stat(path); err == nil {
-		defer un(trace("Loading map"))
-		fmt.Printf("Loading section: %s bytes: %d\n", path, unsafe.Sizeof(section.position))
+		defer un(trace(fmt.Sprintf("Loading map %d,%d", sx, sy)))
 
 		f, err := os.Open(path)
 		defer f.Close()
@@ -228,7 +240,6 @@ func (loader *Loader) load(sx, sy int) (*Section, error) {
 		if err != nil {
 			return nil, err
 		}
-		fmt.Printf("\tversion=%d\n", version[0])
 
 		// if version > VERSION... do something
 		dec := gob.NewDecoder(fz)
@@ -240,12 +251,26 @@ func (loader *Loader) load(sx, sy int) (*Section, error) {
 		if err != nil {
 			return nil, err
 		}
+		if version[0] >= 3 {
+			var bytes []byte
+			err = dec.Decode(&bytes)
+			if err != nil {
+				return nil, err
+			}
+			data := map[string]interface{}{}
+			err = json.Unmarshal(bytes, &data)
+			if err != nil {
+				return nil, err
+			}
+			fixArrays(data)
+			section.data = data
+		}
 	}
 	return section, nil
 }
 
 func (loader *Loader) save(section *Section) error {
-	defer un(trace("Saving map"))
+	defer un(trace(fmt.Sprintf("Saving map %d,%d", section.X, section.Y)))
 
 	mapName := mapFileName(section.X, section.Y)
 	var path string
@@ -256,7 +281,6 @@ func (loader *Loader) save(section *Section) error {
 		// the runner io always to user dir
 		path = filepath.Join(loader.userDir, mapName)
 	}
-	fmt.Printf("Writing section: %s\n", path)
 
 	f, err := os.Create(path)
 	if err != nil {
@@ -278,18 +302,60 @@ func (loader *Loader) save(section *Section) error {
 	if err != nil {
 		return err
 	}
+	jsonstr, err := json.Marshal(section.data)
+	if err != nil {
+		return err
+	}
+	err = enc.Encode([]byte(jsonstr))
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
 
+func fixArrays(data interface{}) {
+
+	mapdata, ok := data.(map[string]interface{})
+	if ok {
+		for k, v := range mapdata {
+			m, ok := v.(map[string]interface{})
+			if ok {
+				fixArrays(m)
+			}
+
+			arr, ok := v.([]interface{})
+			if ok {
+				fixArrays(arr)
+				mapdata[k] = &arr
+			}
+		}
+	}
+
+	arrdata, ok := data.([]interface{})
+	if ok {
+		for i, v := range arrdata {
+			m, ok := v.(map[string]interface{})
+			if ok {
+				fixArrays(m)
+			}
+
+			arr, ok := v.([]interface{})
+			if ok {
+				fixArrays(arr)
+				arrdata[i] = &arr
+			}
+		}
+	}
+}
+
 func trace(s string) (string, time.Time) {
-	log.Println("START:", s)
 	return s, time.Now()
 }
 
 func un(s string, startTime time.Time) {
 	endTime := time.Now()
-	log.Println("  END:", s, "ElapsedTime in seconds:", endTime.Sub(startTime))
+	log.Println(s, "ElapsedTime in seconds:", endTime.Sub(startTime))
 }
 
 func mapFileName(sx, sy int) string {

@@ -356,8 +356,9 @@ func (e *Editor) shapeSelectorContents(panel *gfx.Panel) bool {
 	return false
 }
 
-func (e *Editor) SectionLoad(x, y int) {
+func (e *Editor) SectionLoad(x, y int, data map[string]interface{}) {
 }
 
-func (e *Editor) SectionSave(x, y int) {
+func (e *Editor) SectionSave(x, y int) map[string]interface{} {
+	return map[string]interface{}{}
 }

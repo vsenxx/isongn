@@ -9,16 +9,17 @@ import (
 )
 
 type Runner struct {
-	app             *gfx.App
-	ctx             *bscript.Context
-	eventsCall      *bscript.Variable
-	deltaArg        *bscript.Value
-	sectionLoadCall *bscript.Variable
-	sectionLoadXArg *bscript.Value
-	sectionLoadYArg *bscript.Value
-	sectionSaveCall *bscript.Variable
-	sectionSaveXArg *bscript.Value
-	sectionSaveYArg *bscript.Value
+	app                *gfx.App
+	ctx                *bscript.Context
+	eventsCall         *bscript.Variable
+	deltaArg           *bscript.Value
+	sectionLoadCall    *bscript.Variable
+	sectionLoadXArg    *bscript.Value
+	sectionLoadYArg    *bscript.Value
+	sectionLoadDataArg *bscript.Value
+	sectionSaveCall    *bscript.Variable
+	sectionSaveXArg    *bscript.Value
+	sectionSaveYArg    *bscript.Value
 }
 
 func NewRunner() *Runner {
@@ -48,7 +49,8 @@ func (runner *Runner) Init(app *gfx.App, config map[string]interface{}) {
 
 	runner.sectionLoadXArg = &bscript.Value{Number: &bscript.SignedNumber{}}
 	runner.sectionLoadYArg = &bscript.Value{Number: &bscript.SignedNumber{}}
-	runner.sectionLoadCall = gfx.NewFunctionCall("onSectionLoad", runner.sectionLoadXArg, runner.sectionLoadYArg)
+	runner.sectionLoadDataArg = &bscript.Value{}
+	runner.sectionLoadCall = gfx.NewFunctionCall("onSectionLoad", runner.sectionLoadXArg, runner.sectionLoadYArg, runner.sectionLoadDataArg)
 
 	runner.sectionSaveXArg = &bscript.Value{Number: &bscript.SignedNumber{}}
 	runner.sectionSaveYArg = &bscript.Value{Number: &bscript.SignedNumber{}}
@@ -74,14 +76,16 @@ func (runner *Runner) GetZ() int {
 	return 0
 }
 
-func (runner *Runner) SectionLoad(x, y int) {
+func (runner *Runner) SectionLoad(x, y int, data map[string]interface{}) {
 	runner.sectionLoadXArg.Number.Number = float64(x)
 	runner.sectionLoadYArg.Number.Number = float64(y)
+	runner.sectionLoadDataArg.Map = gfx.ToBscriptMap(data)
 	runner.sectionLoadCall.Evaluate(runner.ctx)
 }
 
-func (runner *Runner) SectionSave(x, y int) {
+func (runner *Runner) SectionSave(x, y int) map[string]interface{} {
 	runner.sectionSaveXArg.Number.Number = float64(x)
 	runner.sectionSaveYArg.Number.Number = float64(y)
-	runner.sectionSaveCall.Evaluate(runner.ctx)
+	ret, _ := runner.sectionSaveCall.Evaluate(runner.ctx)
+	return ret.(map[string]interface{})
 }

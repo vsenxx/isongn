@@ -34,7 +34,6 @@ type BlockPos struct {
 	dir            shapes.Direction
 	animationTimer float64
 	animationType  int
-	animationStep  int
 	animationSpeed float64
 	ScrollOffset   [2]float32
 }
@@ -372,15 +371,25 @@ func (view *View) GetShape(worldX, worldY, worldZ int) (int, int, int, int, bool
 	return b.block.shape.Index, originWorldX, originWorldY, originWorldZ, true
 }
 
-func (view *View) Fits(worldX, worldY, worldZ int, shape *shapes.Shape) bool {
+func (view *View) Fits(toWorldX, toWorldY, toWorldZ int, fromWorldX, fromWorldY, fromWorldZ int) bool {
+	shapeIndex, ox, oy, oz, validPos := view.GetShape(fromWorldX, fromWorldY, fromWorldZ)
+	if validPos == false {
+		return false
+	}
+	shape := shapes.Shapes[shapeIndex]
+
 	fits := true
 	shape.Traverse(func(x, y, z int) bool {
-		viewX, viewY, viewZ, validPos := view.toViewPos(worldX+x, worldY+y, worldZ+z)
+		viewX, viewY, viewZ, validPos := view.toViewPos(toWorldX+x, toWorldY+y, toWorldZ+z)
 		if validPos {
 			b := view.origins[viewX][viewY][viewZ]
 			if b != nil && b.block != nil {
-				fits = false
-				return true
+				wx, wy, wz := view.toWorldPos(b.x, b.y, b.z)
+				// a shape is uniquely identified by its world coords (not its shape index)
+				if !(wx == ox && wy == oy && wz == oz) {
+					fits = false
+					return true
+				}
 			}
 		}
 		return false
@@ -403,21 +412,11 @@ func (view *View) FindTop(worldX, worldY int, shape *shapes.Shape) int {
 	return maxZ
 }
 
-func (view *View) InspectUnder(worldX, worldY, worldZ int, shape *shapes.Shape, registeredShapes map[string]bool) bool {
-	res := false
-	for x := 0; x < int(shape.Size[0]); x++ {
-		for y := 0; y < int(shape.Size[1]); y++ {
-			shapeIndex, _, _, _, found := view.GetShape(worldX+x, worldY+y, worldZ-1)
-			if found {
-				shape := shapes.Shapes[shapeIndex]
-				if _, ok := registeredShapes[shape.Name]; ok {
-					registeredShapes[shape.Name] = true
-					res = true
-				}
-			}
-		}
+func (view *View) MoveShape(worldX, worldY, worldZ, newWorldX, newWorldY, newWorldZ int) {
+	blockPos, shapeIndex := view.EraseShape(worldX, worldY, worldZ)
+	if blockPos != nil {
+		view.SetShape(newWorldX, newWorldY, newWorldZ, shapeIndex)
 	}
-	return res
 }
 
 func (view *View) SetShape(worldX, worldY, worldZ int, shapeIndex int) *BlockPos {
@@ -425,12 +424,16 @@ func (view *View) SetShape(worldX, worldY, worldZ int, shapeIndex int) *BlockPos
 	return view.setShapeInner(worldX, worldY, worldZ, shapeIndex, true)
 }
 
-func (view *View) EraseShape(worldX, worldY, worldZ int) *BlockPos {
+func (view *View) EraseShape(worldX, worldY, worldZ int) (*BlockPos, int) {
 	if shapeIndex, ox, oy, oz, hasShape := view.GetShape(worldX, worldY, worldZ); hasShape {
 		view.Loader.EraseShape(ox, oy, oz)
-		return view.setShapeInner(ox, oy, oz, shapeIndex, false)
+		return view.setShapeInner(ox, oy, oz, shapeIndex, false), shapeIndex
 	}
-	return nil
+
+	// sometimes this is called for a shape (creature) no longer in view
+	// assume the position is its origin and remove it from the sector
+	view.Loader.EraseShape(worldX, worldY, worldZ)
+	return nil, 0
 }
 
 func (view *View) setShapeInner(worldX, worldY, worldZ int, shapeIndex int, hasShape bool) *BlockPos {
@@ -596,7 +599,7 @@ func (b *BlockPos) Draw(view *View) {
 		if animation, ok := b.block.shape.Animations[b.animationType]; ok {
 			b.incrAnimationStep(animation)
 			if steps, ok := animation.Tex[b.dir]; ok {
-				gl.Uniform1f(view.textureOffsetUniform, steps[b.animationStep].TexOffset[0])
+				gl.Uniform1f(view.textureOffsetUniform, steps[animation.AnimationStep].TexOffset[0])
 				animated = true
 			}
 		}
@@ -612,10 +615,10 @@ func (b *BlockPos) incrAnimationStep(animation *shapes.Animation) {
 	b.animationTimer -= state.delta
 	if b.animationTimer <= 0 {
 		b.animationTimer = b.animationSpeed
-		b.animationStep++
+		animation.AnimationStep++
 	}
-	if b.animationStep >= animation.Steps {
-		b.animationStep = 0
+	if animation.AnimationStep >= animation.Steps {
+		animation.AnimationStep = 0
 	}
 }
 

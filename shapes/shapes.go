@@ -32,9 +32,10 @@ type TextureCoords struct {
 }
 
 type Animation struct {
-	Name  string
-	Steps int
-	Tex   map[Direction][]*TextureCoords
+	Name          string
+	Steps         int
+	Tex           map[Direction][]*TextureCoords
+	AnimationStep int
 }
 
 const alphaMinDefault = 0.35
