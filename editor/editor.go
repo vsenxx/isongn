@@ -91,10 +91,10 @@ func (e *Editor) isMoveKey() (int, int, bool) {
 	for key, delta := range moveKeys {
 		f := e.app.IsFirstDown(key)
 		if f && e.app.IsDownMod(key, glfw.ModAlt) {
-			return delta[0] * int(shape.Size[0]), delta[1] * int(shape.Size[0]), true
+			return delta[0] * int(shape.Size[0]), delta[1] * int(shape.Size[1]), true
 		}
 		if f && e.app.IsDownMod(key, glfw.ModSuper) {
-			return delta[0] * int(shape.Size[0]), delta[1] * int(shape.Size[0]), false
+			return delta[0] * int(shape.Size[0]), delta[1] * int(shape.Size[1]), false
 		}
 		if f || e.app.IsDownMod(key, glfw.ModShift) {
 			return delta[0], delta[1], false
