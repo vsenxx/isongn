@@ -37,11 +37,14 @@ func NewEditor() *Editor {
 
 func (e *Editor) Init(app *gfx.App, config map[string]interface{}) {
 	e.app = app
+	e.app.FadeIn(func() {
+		e.app.FadeDone()
+	})
 	e.app.Loader.SetIoMode(world.EDITOR_MODE)
 	e.app.View.Load()
 
 	// compile the editor script code
-	_, ctx, err := bscript.Build(
+	ast, ctx, err := bscript.Build(
 		filepath.Join(e.app.Config.GameDir, "src", "editor.b"),
 		false,
 		map[string]interface{}{
@@ -56,6 +59,12 @@ func (e *Editor) Init(app *gfx.App, config map[string]interface{}) {
 
 	// create the editor bscript calls
 	e.editorCall = gfx.NewFunctionCall("editorCommand")
+
+	// run the main method
+	_, err = ast.Evaluate(ctx)
+	if err != nil {
+		panic(err)
+	}
 
 	// add a ui
 	e.app.Ui.Add(int(e.app.Width)-150, 0, 150, int(e.app.Height), e.shapeSelectorContents)
@@ -78,10 +87,14 @@ var moveKeys map[glfw.Key][2]int = map[glfw.Key][2]int{
 }
 
 func (e *Editor) isMoveKey() (int, int, bool) {
+	shape := shapes.Shapes[e.shapeSelectorIndex]
 	for key, delta := range moveKeys {
 		f := e.app.IsFirstDown(key)
 		if f && e.app.IsDownMod(key, glfw.ModAlt) {
-			return delta[0], delta[1], true
+			return delta[0] * int(shape.Size[0]), delta[1] * int(shape.Size[0]), true
+		}
+		if f && e.app.IsDownMod(key, glfw.ModSuper) {
+			return delta[0] * int(shape.Size[0]), delta[1] * int(shape.Size[0]), false
 		}
 		if f || e.app.IsDownMod(key, glfw.ModShift) {
 			return delta[0], delta[1], false
@@ -90,7 +103,7 @@ func (e *Editor) isMoveKey() (int, int, bool) {
 	return 0, 0, false
 }
 
-func (e *Editor) Events(delta float64) {
+func (e *Editor) Events(delta float64, fadeDir int) {
 
 	if e.app.Loader.X != e.lastX || e.app.Loader.Y != e.lastY || e.updateCursor {
 		// e.Z = e.findTop(e.app.Loader.X, e.app.Loader.Y)
@@ -128,13 +141,13 @@ func (e *Editor) Events(delta float64) {
 		}
 	}
 
-	shape := shapes.Shapes[e.shapeSelectorIndex]
+	// shape := shapes.Shapes[e.shapeSelectorIndex]
 	changed := false
 	dx, dy, insertMode := e.isMoveKey()
-	if insertMode {
-		dx *= int(shape.Size[0])
-		dy *= int(shape.Size[1])
-	}
+	// if insertMode {
+	// 	dx *= int(shape.Size[0])
+	// 	dy *= int(shape.Size[1])
+	// }
 
 	f := e.app.IsFirstDown(glfw.KeySpace)
 	ff := e.app.IsDownMod(glfw.KeySpace, glfw.ModShift)

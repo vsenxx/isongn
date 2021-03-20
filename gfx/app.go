@@ -16,10 +16,12 @@ import (
 	"github.com/uzudil/isongn/world"
 )
 
+const fadeInterval = 0.5
+
 type Game interface {
 	Init(app *App, config map[string]interface{})
 	Name() string
-	Events(delta float64)
+	Events(delta float64, fadeDir int)
 	GetZ() int
 }
 
@@ -66,6 +68,10 @@ type App struct {
 	windowWidthDpi, windowHeightDpi int
 	dpiX, dpiY                      float32
 	frameBuffer, uiFrameBuffer      *FrameBuffer
+	fadeDir                         int
+	fadeTimer                       float64
+	fadeFx                          func()
+	fade                            float32
 }
 
 func NewApp(game Game, gameDir string, windowWidth, windowHeight int, targetFps float64) *App {
@@ -304,18 +310,53 @@ func (app *App) Run() {
 		app.CalcFps()
 
 		// handle events
-		app.Game.Events(delta)
+		app.Game.Events(delta, app.fadeDir)
+
+		app.incrFade(last)
 
 		app.frameBuffer.Enable(app.Width, app.Height)
 		app.View.Draw(delta)
-		app.frameBuffer.Draw(app.windowWidthDpi, app.windowHeightDpi)
+		app.frameBuffer.Draw(app.windowWidthDpi, app.windowHeightDpi, app.fade)
 
 		app.uiFrameBuffer.Enable(app.Width, app.Height)
 		app.Ui.Draw()
-		app.uiFrameBuffer.Draw(app.windowWidthDpi, app.windowHeightDpi)
+		app.uiFrameBuffer.Draw(app.windowWidthDpi, app.windowHeightDpi, app.fade)
 
 		// Maintenance
 		app.Window.SwapBuffers()
 		glfw.PollEvents()
+	}
+}
+
+func (app *App) FadeOut(fx func()) {
+	app.fadeDir = -1
+	app.fade = 1
+	app.fadeTimer = glfw.GetTime() + fadeInterval
+	app.fadeFx = fx
+}
+
+func (app *App) FadeIn(fx func()) {
+	app.fadeDir = 1
+	app.fade = 0
+	app.fadeTimer = glfw.GetTime() + fadeInterval
+	app.fadeFx = fx
+}
+
+func (app *App) FadeDone() {
+	app.fadeFx = nil
+	app.fadeDir = 0
+	app.fade = 1
+}
+
+func (app *App) incrFade(last float64) {
+	if app.fadeFx != nil {
+		if app.fadeTimer > last {
+			app.fade = float32((app.fadeTimer - last) / fadeInterval)
+			if app.fadeDir == 1 {
+				app.fade = 1 - app.fade
+			}
+		} else {
+			app.fadeFx()
+		}
 	}
 }

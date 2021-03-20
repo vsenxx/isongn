@@ -13,6 +13,7 @@ type Runner struct {
 	ctx                *bscript.Context
 	eventsCall         *bscript.Variable
 	deltaArg           *bscript.Value
+	fadeDirArg         *bscript.Value
 	sectionLoadCall    *bscript.Variable
 	sectionLoadXArg    *bscript.Value
 	sectionLoadYArg    *bscript.Value
@@ -45,7 +46,8 @@ func (runner *Runner) Init(app *gfx.App, config map[string]interface{}) {
 	runner.ctx = ctx
 
 	runner.deltaArg = &bscript.Value{Number: &bscript.SignedNumber{}}
-	runner.eventsCall = gfx.NewFunctionCall("events", runner.deltaArg)
+	runner.fadeDirArg = &bscript.Value{Number: &bscript.SignedNumber{}}
+	runner.eventsCall = gfx.NewFunctionCall("events", runner.deltaArg, runner.fadeDirArg)
 
 	runner.sectionLoadXArg = &bscript.Value{Number: &bscript.SignedNumber{}}
 	runner.sectionLoadYArg = &bscript.Value{Number: &bscript.SignedNumber{}}
@@ -67,8 +69,9 @@ func (runner *Runner) Name() string {
 	return "runner"
 }
 
-func (runner *Runner) Events(delta float64) {
+func (runner *Runner) Events(delta float64, fadeDir int) {
 	runner.deltaArg.Number.Number = delta
+	runner.fadeDirArg.Number.Number = float64(fadeDir)
 	runner.eventsCall.Evaluate(runner.ctx)
 }
 

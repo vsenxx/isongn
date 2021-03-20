@@ -12,6 +12,7 @@ type FrameBuffer struct {
 	frameBufferTexID int32
 	vertAttrib       uint32
 	aspectUniform    int32
+	fadeUniform      int32
 	texCoordAttrib   uint32
 	useAspectRatio   bool
 }
@@ -69,6 +70,7 @@ func NewFrameBuffer(width, height int32, useAspectRatio bool) *FrameBuffer {
 	fb.frameBufferTexID = gl.GetUniformLocation(fb.program, gl.Str("renderedTexture\x00"))
 	gl.BindFragDataLocation(fb.program, 0, gl.Str("outputColor\x00"))
 	fb.aspectUniform = gl.GetUniformLocation(fb.program, gl.Str("aspect\x00"))
+	fb.fadeUniform = gl.GetUniformLocation(fb.program, gl.Str("fade\x00"))
 	fb.vertAttrib = uint32(gl.GetAttribLocation(fb.program, gl.Str("vert\x00")))
 	fb.texCoordAttrib = uint32(gl.GetAttribLocation(fb.program, gl.Str("vertTexCoord\x00")))
 	gl.GenVertexArrays(1, &fb.vao)
@@ -83,7 +85,7 @@ func (fb *FrameBuffer) Enable(width, height int) {
 	gl.Viewport(0, 0, int32(width), int32(height))
 }
 
-func (fb *FrameBuffer) Draw(windowWidth, windowHeight int) {
+func (fb *FrameBuffer) Draw(windowWidth, windowHeight int, fade float32) {
 	// render to screen
 	gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
 	// window size
@@ -105,6 +107,7 @@ func (fb *FrameBuffer) Draw(windowWidth, windowHeight int) {
 	} else {
 		gl.Uniform1f(fb.aspectUniform, 1)
 	}
+	gl.Uniform1f(fb.fadeUniform, fade)
 	gl.DrawArrays(gl.TRIANGLES, 0, 3*2*3)
 }
 
@@ -123,6 +126,7 @@ void main() {
 var fragmentShaderFb = `
 #version 330
 uniform sampler2D tex;
+uniform float fade;
 in vec2 fragTexCoord;
 layout(location = 0) out vec4 outputColor;
 void main() {
@@ -130,6 +134,6 @@ void main() {
 	if (val.a < 0.1) {
 		discard;
 	}
-	outputColor = val;
+	outputColor = val * fade;
 }
 ` + "\x00"

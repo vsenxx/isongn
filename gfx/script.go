@@ -134,6 +134,20 @@ func moveViewTo(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	return nil, nil
 }
 
+func fadeViewTo(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+	x := int(arg[0].(float64))
+	y := int(arg[1].(float64))
+	app := ctx.App["app"].(*App)
+	app.FadeOut(func() {
+		app.FadeIn(func() {
+			app.FadeDone()
+		})
+		app.Loader.MoveTo(x, y)
+		app.View.Load()
+	})
+	return nil, nil
+}
+
 func getDir(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	dx := int(arg[0].(float64))
 	dy := int(arg[1].(float64))
@@ -331,6 +345,7 @@ func InitScript() {
 	bscript.AddBuiltin("setOffset", setOffset)
 	bscript.AddBuiltin("fits", fits)
 	bscript.AddBuiltin("moveViewTo", moveViewTo)
+	bscript.AddBuiltin("fadeViewTo", fadeViewTo)
 	bscript.AddBuiltin("setViewScroll", setViewScroll)
 	bscript.AddBuiltin("print", print)
 	bscript.AddBuiltin("getDir", getDir)

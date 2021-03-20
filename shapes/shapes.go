@@ -96,8 +96,6 @@ func InitShapes(gameDir string, data []map[string]interface{}) error {
 		for index, s := range shapes {
 			shapeDef := s.(map[string]interface{})
 			name := shapeDef["name"].(string)
-			fmt.Printf("\tProcessing %s\n", name)
-			Names[name] = len(Shapes)
 			appendShape(index, name, shapeDef, imageIndex, img, shapeMeta)
 		}
 	}
@@ -185,6 +183,7 @@ func appendShape(index int, name string, shapeDef map[string]interface{}, imageI
 	}
 	// add shape
 	Shapes = append(Shapes, shape)
+	Names[name] = shape.Index
 }
 
 func (shape *Shape) HasEdges(shapeName string) bool {
