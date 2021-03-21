@@ -39,9 +39,14 @@ func intersects(start, end, start2, end2 int) bool {
 }
 
 func setMaxZ(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
-	if f, ok := arg[0].(float64); ok {
-		app := ctx.App["app"].(*App)
-		app.View.SetMaxZ(int(f))
+	f := int(arg[0].(float64))
+	app := ctx.App["app"].(*App)
+	app.View.SetMaxZ(int(f))
+	if roofName, ok := arg[1].(string); ok {
+		roof := shapes.Shapes[shapes.Names[roofName]]
+		app.View.SetUnderShape(roof)
+	} else {
+		app.View.SetUnderShape(nil)
 	}
 	return nil, nil
 }

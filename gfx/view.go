@@ -63,6 +63,7 @@ type View struct {
 	Cursor               *BlockPos
 	ScrollOffset         [3]float32
 	maxZ                 int
+	underShape           *shapes.Shape
 }
 
 const viewSize = 10
@@ -306,6 +307,10 @@ func (view *View) SetMaxZ(z int) {
 	view.maxZ = z
 }
 
+func (view *View) SetUnderShape(shape *shapes.Shape) {
+	view.underShape = shape
+}
+
 func (view *View) Load() {
 	// reset
 	view.traverse(func(x, y, z int) {
@@ -540,6 +545,17 @@ func (view *View) Scroll(dx, dy, dz float32) {
 	view.ScrollOffset[2] = dz
 }
 
+func (view *View) isUnderShape(x, y, z int) bool {
+	if view.underShape == nil {
+		return true
+	}
+	wx, wy, _ := view.toWorldPos(x, y, z)
+	if shapeIndex, _, _, _, hasShape := view.GetShape(wx, wy, view.maxZ); hasShape {
+		return shapes.Shapes[shapeIndex].Group == view.underShape.Group
+	}
+	return false
+}
+
 type DrawState struct {
 	init    bool
 	texture uint32
@@ -563,11 +579,12 @@ func (view *View) Draw(delta float64) {
 	state.init = false
 	view.traverse(func(x, y, z int) {
 		blockPos := view.blockPos[x][y][z]
-		if blockPos.block != nil && z < view.maxZ {
+		underShape := view.isUnderShape(x, y, z)
+		if blockPos.block != nil && z < view.maxZ && underShape {
 			blockPos.Draw(view)
 		}
 
-		if z == 0 {
+		if z == 0 && underShape {
 			edge := view.edges[x][y]
 			if edge.block != nil {
 				edge.Draw(view)

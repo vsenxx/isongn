@@ -43,6 +43,7 @@ const alphaMinDefault = 0.35
 type Shape struct {
 	Index         int
 	Name          string
+	Group         int
 	Image         *image.RGBA
 	Size          [3]float32
 	Tex           *TextureCoords
@@ -139,9 +140,16 @@ func appendShape(index int, name string, shapeDef map[string]interface{}, imageI
 		offset[2] = float32(offsetI[2].(float64))
 	}
 
+	groupF, ok := shapeDef["group"].(float64)
+	var group int
+	if ok {
+		group = int(groupF)
+	}
+
 	shape := newShape(
 		imageIndex*0x100+index, // each image can contain max 256 shapes
 		name,
+		group,
 		size,
 		px, py, pw, ph,
 		img,
@@ -223,10 +231,11 @@ func findShape(name string) *Shape {
 	panic("Can't find shape: " + name)
 }
 
-func newShape(index int, name string, size [3]float32, px, py, pw, ph float32, img image.Image, fudge, alphaMin float32, imageIndex int, shapeMeta *ShapeMeta, offset [3]float32) *Shape {
+func newShape(index int, name string, group int, size [3]float32, px, py, pw, ph float32, img image.Image, fudge, alphaMin float32, imageIndex int, shapeMeta *ShapeMeta, offset [3]float32) *Shape {
 	shape := &Shape{
 		Index:      index,
 		Name:       name,
+		Group:      group,
 		Size:       size,
 		Tex:        NewTextureCoords(img.Bounds(), px, py, pw, ph),
 		Fudge:      fudge,
