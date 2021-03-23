@@ -55,6 +55,7 @@ type Shape struct {
 	Offset        [3]float32
 	EditorVisible bool
 	Animations    map[int]*Animation
+	SwayEnabled   bool
 }
 
 var Shapes []*Shape
@@ -159,6 +160,11 @@ func appendShape(index int, name string, shapeDef map[string]interface{}, imageI
 		shapeMeta,
 		offset,
 	)
+
+	// sway
+	if sway, ok := shapeDef["sway"].(bool); ok {
+		shape.SwayEnabled = sway
+	}
 
 	// edges
 	refName, ok := shapeDef["ref"]

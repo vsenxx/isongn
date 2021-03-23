@@ -50,6 +50,9 @@ type View struct {
 	alphaMinUniform      int32
 	viewScrollUniform    int32
 	modelScrollUniform   int32
+	timeUniform          int32
+	heightUniform        int32
+	swayEnabledUniform   int32
 	vertAttrib           uint32
 	texCoordAttrib       uint32
 	textures             map[int]*Texture
@@ -110,6 +113,9 @@ func InitView(zoom float64, camera, shear [3]float32, loader *world.Loader) *Vie
 	view.modelUniform = gl.GetUniformLocation(view.program, gl.Str("model\x00"))
 	view.viewScrollUniform = gl.GetUniformLocation(view.program, gl.Str("viewScroll\x00"))
 	view.modelScrollUniform = gl.GetUniformLocation(view.program, gl.Str("modelScroll\x00"))
+	view.timeUniform = gl.GetUniformLocation(view.program, gl.Str("time\x00"))
+	view.heightUniform = gl.GetUniformLocation(view.program, gl.Str("height\x00"))
+	view.swayEnabledUniform = gl.GetUniformLocation(view.program, gl.Str("swayEnabled\x00"))
 	view.textureUniform = gl.GetUniformLocation(view.program, gl.Str("tex\x00"))
 	view.textureOffsetUniform = gl.GetUniformLocation(view.program, gl.Str("textureOffset\x00"))
 	view.alphaMinUniform = gl.GetUniformLocation(view.program, gl.Str("alphaMin\x00"))
@@ -561,6 +567,7 @@ type DrawState struct {
 	texture uint32
 	vbo     uint32
 	delta   float64
+	time    float64
 }
 
 var state DrawState = DrawState{}
@@ -576,6 +583,7 @@ func (view *View) Draw(delta float64) {
 	gl.EnableVertexAttribArray(view.texCoordAttrib)
 	gl.Uniform3fv(view.viewScrollUniform, 1, &view.ScrollOffset[0])
 	state.delta = delta
+	state.time += delta
 	state.init = false
 	view.traverse(func(x, y, z int) {
 		blockPos := view.blockPos[x][y][z]
@@ -610,6 +618,13 @@ func (b *BlockPos) Draw(view *View) {
 	gl.UniformMatrix4fv(view.modelUniform, 1, false, &b.model[0])
 	gl.Uniform2fv(view.modelScrollUniform, 1, &b.ScrollOffset[0])
 	gl.Uniform1f(view.alphaMinUniform, b.block.shape.AlphaMin)
+	gl.Uniform1f(view.timeUniform, float32(state.time))
+	gl.Uniform1f(view.heightUniform, b.block.shape.Size[2])
+	if b.block.shape.SwayEnabled {
+		gl.Uniform1i(view.swayEnabledUniform, 1)
+	} else {
+		gl.Uniform1i(view.swayEnabledUniform, 0)
+	}
 
 	animated := false
 	if b.dir != shapes.DIR_NONE {
@@ -655,17 +670,33 @@ uniform mat4 model;
 uniform float textureOffset;
 uniform vec3 viewScroll;
 uniform vec2 modelScroll;
+uniform float time;
+uniform float height;
+uniform int swayEnabled;
 in vec3 vert;
 in vec2 vertTexCoord;
 out vec2 fragTexCoord;
 void main() {
     fragTexCoord = vec2(vertTexCoord.x + textureOffset, vertTexCoord.y);
+
+	float swayX = 0;
+	if(swayEnabled == 1) {
+		swayX = (vert.z / height) * sin(time) / 10.0;
+	}
+	float swayY = 0;
+	if(swayEnabled == 1) {
+		swayY = (vert.z / height) * cos(time) / 10.0;
+	}	
+	float offsX = modelScroll.x - viewScroll.x + swayX;
+	float offsY = modelScroll.y - viewScroll.y + swayY;
+	float offsZ = -viewScroll.z;
+
 	// matrix constructor is in column first order
 	mat4 modelScroll = mat4(
 		1.0, 0.0, 0.0, 0.0,
 		0.0, 1.0, 0.0, 0.0,
 		0.0, 0.0, 1.0, 0.0,
-		model[3][0] + modelScroll.x - viewScroll.x, model[3][1] + modelScroll.y - viewScroll.y, model[3][2] - viewScroll.z, 1.0
+		model[3][0] + offsX, model[3][1] + offsY, model[3][2] + offsZ, 1.0
 	);
     gl_Position = projection * camera * modelScroll * vec4(vert, 1);
 }
