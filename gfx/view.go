@@ -28,14 +28,15 @@ type Block struct {
 
 // BlockPos is a displayed Shape at a location
 type BlockPos struct {
-	model          mgl32.Mat4
-	x, y, z        int
-	block          *Block
-	dir            shapes.Direction
-	animationTimer float64
-	animationType  int
-	animationSpeed float64
-	ScrollOffset   [2]float32
+	model                  mgl32.Mat4
+	x, y, z                int
+	worldX, worldY, worldZ int
+	block                  *Block
+	dir                    shapes.Direction
+	animationTimer         float64
+	animationType          int
+	animationSpeed         float64
+	ScrollOffset           [2]float32
 }
 
 type View struct {
@@ -52,6 +53,7 @@ type View struct {
 	modelScrollUniform   int32
 	timeUniform          int32
 	heightUniform        int32
+	uniqueOffsetUniform  int32
 	swayEnabledUniform   int32
 	vertAttrib           uint32
 	texCoordAttrib       uint32
@@ -115,6 +117,7 @@ func InitView(zoom float64, camera, shear [3]float32, loader *world.Loader) *Vie
 	view.modelScrollUniform = gl.GetUniformLocation(view.program, gl.Str("modelScroll\x00"))
 	view.timeUniform = gl.GetUniformLocation(view.program, gl.Str("time\x00"))
 	view.heightUniform = gl.GetUniformLocation(view.program, gl.Str("height\x00"))
+	view.uniqueOffsetUniform = gl.GetUniformLocation(view.program, gl.Str("uniqueOffset\x00"))
 	view.swayEnabledUniform = gl.GetUniformLocation(view.program, gl.Str("swayEnabled\x00"))
 	view.textureUniform = gl.GetUniformLocation(view.program, gl.Str("tex\x00"))
 	view.textureOffsetUniform = gl.GetUniformLocation(view.program, gl.Str("textureOffset\x00"))
@@ -335,6 +338,10 @@ func (view *View) Load() {
 	// load
 	view.traverse(func(x, y, z int) {
 		worldX, worldY, worldZ := view.toWorldPos(x, y, z)
+		blockPos := view.blockPos[x][y][z]
+		blockPos.worldX = worldX
+		blockPos.worldY = worldY
+		blockPos.worldZ = worldZ
 		shapeIndex, hasShape := view.Loader.GetShape(worldX, worldY, worldZ)
 		if hasShape {
 			view.setShapeInner(worldX, worldY, worldZ, shapeIndex, true)
@@ -620,6 +627,7 @@ func (b *BlockPos) Draw(view *View) {
 	gl.Uniform1f(view.alphaMinUniform, b.block.shape.AlphaMin)
 	gl.Uniform1f(view.timeUniform, float32(state.time))
 	gl.Uniform1f(view.heightUniform, b.block.shape.Size[2])
+	gl.Uniform1i(view.uniqueOffsetUniform, int32(b.worldX+b.worldY+b.worldZ))
 	if b.block.shape.SwayEnabled {
 		gl.Uniform1i(view.swayEnabledUniform, 1)
 	} else {
@@ -673,6 +681,7 @@ uniform vec2 modelScroll;
 uniform float time;
 uniform float height;
 uniform int swayEnabled;
+uniform int uniqueOffset;
 in vec3 vert;
 in vec2 vertTexCoord;
 out vec2 fragTexCoord;
@@ -681,11 +690,11 @@ void main() {
 
 	float swayX = 0;
 	if(swayEnabled == 1) {
-		swayX = (vert.z / height) * sin(time) / 10.0;
+		swayX = (vert.z / height) * sin(time + uniqueOffset) / 10.0;
 	}
 	float swayY = 0;
 	if(swayEnabled == 1) {
-		swayY = (vert.z / height) * cos(time) / 10.0;
+		swayY = (vert.z / height) * cos(time + uniqueOffset) / 10.0;
 	}	
 	float offsX = modelScroll.x - viewScroll.x + swayX;
 	float offsY = modelScroll.y - viewScroll.y + swayY;
