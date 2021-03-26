@@ -190,6 +190,7 @@ func (loader *Loader) getSection(sx, sy int) (*Section, error) {
 func (loader *Loader) SaveAll() error {
 	for _, c := range loader.sectionCache.cache {
 		if c != nil {
+			c.data = loader.observer.SectionSave(c.X, c.Y)
 			err := loader.save(c)
 			if err != nil {
 				return err

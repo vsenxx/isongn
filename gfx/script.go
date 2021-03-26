@@ -8,6 +8,16 @@ import (
 	"github.com/uzudil/isongn/shapes"
 )
 
+func saveGame(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+	app := ctx.App["app"].(*App)
+	app.Loader.SaveAll()
+	return nil, nil
+}
+
+func loadGame(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+	return nil, nil
+}
+
 func intersectsShapes(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	x := int(arg[0].(float64))
 	y := int(arg[1].(float64))
@@ -355,6 +365,8 @@ func InitScript() {
 	bscript.AddBuiltin("print", print)
 	bscript.AddBuiltin("getDir", getDir)
 	bscript.AddBuiltin("isInView", isInView)
+	bscript.AddBuiltin("saveGame", saveGame)
+	bscript.AddBuiltin("loadGame", loadGame)
 	for k, v := range constants {
 		bscript.AddConstant(k, v)
 	}
