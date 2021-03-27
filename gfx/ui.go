@@ -23,7 +23,7 @@ type Ui struct {
 
 type Panel struct {
 	X, Y, W, H int
-	Background color.RGBA
+	Background color.Color
 	Visible    bool
 	Rgba       *image.RGBA
 	texture    uint32
@@ -62,18 +62,22 @@ func InitUi(screenWidth, screenHeight int) *Ui {
 }
 
 func (ui *Ui) Add(x, y, w, h int, renderer func(*Panel) bool) *Panel {
-	panel := ui.NewPanel(x, y, w, h, renderer)
+	return ui.AddBg(x, y, w, h, color.RGBA{0x80, 0x80, 0x80, 0xff}, renderer)
+}
+
+func (ui *Ui) AddBg(x, y, w, h int, bg color.Color, renderer func(*Panel) bool) *Panel {
+	panel := ui.NewPanel(x, y, w, h, bg, renderer)
 	ui.panels = append(ui.panels, panel)
 	return panel
 }
 
-func (ui *Ui) NewPanel(x, y, w, h int, renderer func(*Panel) bool) *Panel {
+func (ui *Ui) NewPanel(x, y, w, h int, bg color.Color, renderer func(*Panel) bool) *Panel {
 	panel := &Panel{
 		X:          x,
 		Y:          y,
 		W:          w,
 		H:          h,
-		Background: color.RGBA{0x80, 0x80, 0x80, 0xff},
+		Background: bg,
 		Visible:    true,
 		renderer:   renderer,
 	}

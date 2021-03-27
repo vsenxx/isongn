@@ -204,6 +204,15 @@ func isPressed(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	return nil, fmt.Errorf("%s unable to parse key at", ctx.Pos)
 }
 
+func printMessage(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+	x := int(arg[0].(float64))
+	y := int(arg[1].(float64))
+	message := arg[2].(string)
+	app := ctx.App["app"].(*App)
+	app.Game.PrintMessage(x, y, message)
+	return nil, nil
+}
+
 func isDown(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	key := glfw.Key(arg[0].(float64))
 	app := ctx.App["app"].(*App)
@@ -367,6 +376,7 @@ func InitScript() {
 	bscript.AddBuiltin("isInView", isInView)
 	bscript.AddBuiltin("saveGame", saveGame)
 	bscript.AddBuiltin("loadGame", loadGame)
+	bscript.AddBuiltin("printMessage", printMessage)
 	for k, v := range constants {
 		bscript.AddConstant(k, v)
 	}

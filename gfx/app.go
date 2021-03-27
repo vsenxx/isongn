@@ -23,6 +23,7 @@ type Game interface {
 	Name() string
 	Events(delta float64, fadeDir int)
 	GetZ() int
+	PrintMessage(x, y int, message string)
 }
 
 type KeyPress struct {

@@ -1,12 +1,18 @@
 package runner
 
 import (
+	"image/color"
 	"path/filepath"
 
 	"github.com/uzudil/bscript/bscript"
 	"github.com/uzudil/isongn/gfx"
 	"github.com/uzudil/isongn/world"
 )
+
+type Message struct {
+	x, y    int
+	message string
+}
 
 type Runner struct {
 	app                *gfx.App
@@ -21,6 +27,7 @@ type Runner struct {
 	sectionSaveCall    *bscript.Variable
 	sectionSaveXArg    *bscript.Value
 	sectionSaveYArg    *bscript.Value
+	messages           []*Message
 }
 
 func NewRunner() *Runner {
@@ -30,6 +37,8 @@ func NewRunner() *Runner {
 func (runner *Runner) Init(app *gfx.App, config map[string]interface{}) {
 	runner.app = app
 	runner.app.Loader.SetIoMode(world.RUNNER_MODE)
+
+	runner.app.Ui.AddBg(0, 0, int(runner.app.Width), int(runner.app.Height), color.Transparent, runner.overlayContents)
 
 	// compile the editor script code
 	ast, ctx, err := bscript.Build(
@@ -91,4 +100,22 @@ func (runner *Runner) SectionSave(x, y int) map[string]interface{} {
 	runner.sectionSaveYArg.Number.Number = float64(y)
 	ret, _ := runner.sectionSaveCall.Evaluate(runner.ctx)
 	return ret.(map[string]interface{})
+}
+
+func (runner *Runner) overlayContents(panel *gfx.Panel) bool {
+	if len(runner.messages) > 0 {
+		for _, msg := range runner.messages {
+			runner.app.Font.Printf(panel.Rgba, color.White, msg.x, msg.y, msg.message)
+		}
+
+		// clear the messages (but keep memory)
+		runner.messages = runner.messages[:]
+
+		return true
+	}
+	return false
+}
+
+func (runner *Runner) PrintMessage(x, y int, message string) {
+	runner.messages = append(runner.messages, &Message{x, y, message})
 }

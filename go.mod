@@ -1,5 +1,7 @@
 module github.com/uzudil/isongn
 
+replace github.com/uzudil/bscript => /Users/gtorok/go/src/github.com/uzudil/bscript
+
 go 1.15
 
 require (
