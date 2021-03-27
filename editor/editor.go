@@ -376,5 +376,10 @@ func (e *Editor) SectionSave(x, y int) map[string]interface{} {
 	return map[string]interface{}{}
 }
 
-func (e *Editor) PrintMessage(x, y int, message string) {
+func (e *Editor) AddMessage(x, y int, message string, r, g, b uint8) int {
+	return 0
+}
+
+func (e *Editor) DelMessage(int) {
+
 }

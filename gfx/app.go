@@ -23,7 +23,8 @@ type Game interface {
 	Name() string
 	Events(delta float64, fadeDir int)
 	GetZ() int
-	PrintMessage(x, y int, message string)
+	AddMessage(x, y int, message string, r, g, b uint8) int
+	DelMessage(int)
 }
 
 type KeyPress struct {
@@ -39,7 +40,6 @@ type AppConfig struct {
 	Title      string
 	Name       string
 	Version    float64
-	Font       string
 	ViewSize   int
 	ViewSizeZ  int
 	SectorSize int
@@ -93,7 +93,7 @@ func NewApp(game Game, gameDir string, windowWidth, windowHeight int, targetFps 
 		windowWidth:  windowWidth,
 		windowHeight: windowHeight,
 	}
-	font, err := NewFont(filepath.Join(gameDir, appConfig.Font), 32)
+	font, err := NewFont(filepath.Join(gameDir, getFont(appConfig, game.Name())), getFontSize(appConfig, game.Name()))
 	if err != nil {
 		panic(err)
 	}
@@ -145,7 +145,6 @@ func parseConfig(gameDir string) *AppConfig {
 		Title:      data["title"].(string),
 		Name:       strings.ToLower(data["name"].(string)),
 		Version:    data["version"].(float64),
-		Font:       data["font"].(string),
 		ViewSize:   int(view["size"].(float64)),
 		ViewSizeZ:  int(view["sizeZ"].(float64)),
 		SectorSize: int(view["sector"].(float64)),
@@ -179,6 +178,30 @@ func getResolution(appConfig *AppConfig, mode string) (int, int) {
 	}
 	resArray := (resolution.([]interface{}))
 	return int(resArray[0].(float64)), int(resArray[1].(float64))
+}
+
+func getFontSize(appConfig *AppConfig, mode string) int {
+	runtimeConfig, ok := appConfig.runtime[mode]
+	if ok == false {
+		panic("Can't find runtime config")
+	}
+	fontSize, ok := (runtimeConfig.(map[string]interface{}))["fontSize"]
+	if ok == false {
+		panic("Can't find fontSize in runtime config")
+	}
+	return int(fontSize.(float64))
+}
+
+func getFont(appConfig *AppConfig, mode string) string {
+	runtimeConfig, ok := appConfig.runtime[mode]
+	if ok == false {
+		panic("Can't find runtime config")
+	}
+	font, ok := (runtimeConfig.(map[string]interface{}))["font"]
+	if ok == false {
+		panic("Can't find fontSize in runtime config")
+	}
+	return font.(string)
 }
 
 func initUserdir(gameName string) string {

@@ -12,6 +12,7 @@ import (
 type Message struct {
 	x, y    int
 	message string
+	fg      color.Color
 }
 
 type Runner struct {
@@ -27,11 +28,15 @@ type Runner struct {
 	sectionSaveCall    *bscript.Variable
 	sectionSaveXArg    *bscript.Value
 	sectionSaveYArg    *bscript.Value
-	messages           []*Message
+	messages           map[int]*Message
+	messageIndex       int
+	updateOverlay      bool
 }
 
 func NewRunner() *Runner {
-	return &Runner{}
+	return &Runner{
+		messages: map[int]*Message{},
+	}
 }
 
 func (runner *Runner) Init(app *gfx.App, config map[string]interface{}) {
@@ -103,19 +108,30 @@ func (runner *Runner) SectionSave(x, y int) map[string]interface{} {
 }
 
 func (runner *Runner) overlayContents(panel *gfx.Panel) bool {
-	if len(runner.messages) > 0 {
+	if runner.updateOverlay {
+		panel.Clear()
 		for _, msg := range runner.messages {
-			runner.app.Font.Printf(panel.Rgba, color.White, msg.x, msg.y, msg.message)
+			for xx := -1; xx <= 1; xx++ {
+				for yy := -1; yy <= 1; yy++ {
+					runner.app.Font.Printf(panel.Rgba, color.Black, msg.x+xx, msg.y+yy, msg.message)
+				}
+			}
+			runner.app.Font.Printf(panel.Rgba, msg.fg, msg.x, msg.y, msg.message)
 		}
-
-		// clear the messages (but keep memory)
-		runner.messages = runner.messages[:]
-
+		runner.updateOverlay = false
 		return true
 	}
 	return false
 }
 
-func (runner *Runner) PrintMessage(x, y int, message string) {
-	runner.messages = append(runner.messages, &Message{x, y, message})
+func (runner *Runner) AddMessage(x, y int, message string, r, g, b uint8) int {
+	runner.messages[runner.messageIndex] = &Message{x, y, message, color.RGBA{r, g, b, 255}}
+	runner.messageIndex++
+	runner.updateOverlay = true
+	return runner.messageIndex - 1
+}
+
+func (runner *Runner) DelMessage(messageIndex int) {
+	delete(runner.messages, messageIndex)
+	runner.updateOverlay = true
 }

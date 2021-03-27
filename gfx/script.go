@@ -62,7 +62,7 @@ func setMaxZ(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 }
 
 func print(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
-	fmt.Println(arg[0].(string))
+	fmt.Printf("%v\n", arg[0])
 	return nil, nil
 }
 
@@ -204,13 +204,29 @@ func isPressed(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	return nil, fmt.Errorf("%s unable to parse key at", ctx.Pos)
 }
 
-func printMessage(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+func addMessage(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	x := int(arg[0].(float64))
 	y := int(arg[1].(float64))
 	message := arg[2].(string)
+	r := uint8(arg[3].(float64))
+	g := uint8(arg[4].(float64))
+	b := uint8(arg[5].(float64))
 	app := ctx.App["app"].(*App)
-	app.Game.PrintMessage(x, y, message)
+	index := app.Game.AddMessage(x, y, message, r, g, b)
+	return float64(index), nil
+}
+
+func delMessage(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+	index := int(arg[0].(float64))
+	app := ctx.App["app"].(*App)
+	app.Game.DelMessage(index)
 	return nil, nil
+}
+
+func messageWidth(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+	message := arg[0].(string)
+	app := ctx.App["app"].(*App)
+	return float64(app.Font.Width(message)), nil
 }
 
 func isDown(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
@@ -376,7 +392,9 @@ func InitScript() {
 	bscript.AddBuiltin("isInView", isInView)
 	bscript.AddBuiltin("saveGame", saveGame)
 	bscript.AddBuiltin("loadGame", loadGame)
-	bscript.AddBuiltin("printMessage", printMessage)
+	bscript.AddBuiltin("addMessage", addMessage)
+	bscript.AddBuiltin("delMessage", delMessage)
+	bscript.AddBuiltin("messageWidth", messageWidth)
 	for k, v := range constants {
 		bscript.AddConstant(k, v)
 	}

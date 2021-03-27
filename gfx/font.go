@@ -143,7 +143,7 @@ func newChar(ttf *truetype.Font, ch, scale int) (*character, error) {
 }
 
 // Width returns the width of a piece of text in pixels
-func (f *Font) Width(scale float32, fs string, argv ...interface{}) float32 {
+func (f *Font) Width(fs string, argv ...interface{}) float32 {
 
 	var width float32
 
@@ -169,7 +169,7 @@ func (f *Font) Width(scale float32, fs string, argv ...interface{}) float32 {
 		ch := f.chars[runeIndex-lowChar]
 
 		// Now advance cursors for next glyph (note that advance is number of 1/64 pixels)
-		width += float32((ch.advance >> 6)) * scale // Bitshift by 6 to get value in pixels (2^6 = 64 (divide amount of 1/64th pixels by 64 to get amount of pixels))
+		width += float32((ch.advance >> 6)) // Bitshift by 6 to get value in pixels (2^6 = 64 (divide amount of 1/64th pixels by 64 to get amount of pixels))
 
 	}
 
