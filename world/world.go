@@ -16,7 +16,7 @@ import (
 const (
 	SECTION_SIZE   = 200
 	SECTION_Z_SIZE = 24
-	VERSION        = 3
+	VERSION        = 4
 	EDITOR_MODE    = 0
 	RUNNER_MODE    = 1
 )
@@ -29,11 +29,17 @@ type Position struct {
 	Shape int
 }
 
+type PositionList struct {
+	Shapes []int
+}
+
 type Section struct {
 	X, Y     int
 	position [SECTION_SIZE][SECTION_SIZE][SECTION_Z_SIZE]Position
 	edges    [SECTION_SIZE][SECTION_SIZE]Position
-	data     map[string]interface{}
+	// extra non blocking shapes: plants, items, etc.
+	extras [SECTION_SIZE][SECTION_SIZE][SECTION_Z_SIZE]PositionList
+	data   map[string]interface{}
 }
 
 type SectionCache struct {
@@ -118,6 +124,35 @@ func (loader *Loader) GetShape(worldX, worldY, worldZ int) (int, bool) {
 		return 0, false
 	}
 	return shapeIndex - 1, true
+}
+
+func (loader *Loader) AddExtra(x, y, z int, shapeIndex int) bool {
+	section, atomX, atomY, atomZ := loader.getPosInSection(x, y, z)
+	section.extras[atomX][atomY][atomZ].Shapes = append(section.extras[atomX][atomY][atomZ].Shapes, shapeIndex)
+	return true
+}
+
+func (loader *Loader) EraseExtra(x, y, z, shapeIndex int) bool {
+	section, atomX, atomY, atomZ := loader.getPosInSection(x, y, z)
+	e := section.extras[atomX][atomY][atomZ].Shapes
+	for index, currShapeIndex := range e {
+		if currShapeIndex == shapeIndex {
+			section.extras[atomX][atomY][atomZ].Shapes = append(e[:index], e[index+1:]...)
+			return true
+		}
+	}
+	return false
+}
+
+func (loader *Loader) EraseAllExtras(x, y, z int) bool {
+	section, atomX, atomY, atomZ := loader.getPosInSection(x, y, z)
+	section.extras[atomX][atomY][atomZ].Shapes = []int{}
+	return true
+}
+
+func (loader *Loader) GetExtras(worldX, worldY, worldZ int) []int {
+	section, atomX, atomY, atomZ := loader.getPosInSection(worldX, worldY, worldZ)
+	return section.extras[atomX][atomY][atomZ].Shapes
 }
 
 func (loader *Loader) GetSectionPos() (int, int) {
@@ -252,6 +287,12 @@ func (loader *Loader) load(sx, sy int) (*Section, error) {
 		if err != nil {
 			return nil, err
 		}
+		if version[0] >= 4 {
+			err = dec.Decode(&section.extras)
+			if err != nil {
+				return nil, err
+			}
+		}
 		if version[0] >= 3 {
 			var bytes []byte
 			err = dec.Decode(&bytes)
@@ -300,6 +341,10 @@ func (loader *Loader) save(section *Section) error {
 		return err
 	}
 	err = enc.Encode(section.edges)
+	if err != nil {
+		return err
+	}
+	err = enc.Encode(section.extras)
 	if err != nil {
 		return err
 	}

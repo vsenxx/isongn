@@ -56,6 +56,7 @@ type Shape struct {
 	EditorVisible bool
 	Animations    map[int]*Animation
 	SwayEnabled   bool
+	IsExtra       bool
 }
 
 var Shapes []*Shape
@@ -164,6 +165,10 @@ func appendShape(index int, name string, shapeDef map[string]interface{}, imageI
 	// sway
 	if sway, ok := shapeDef["sway"].(bool); ok {
 		shape.SwayEnabled = sway
+	}
+	// extra
+	if extra, ok := shapeDef["extra"].(bool); ok {
+		shape.IsExtra = extra
 	}
 
 	// edges

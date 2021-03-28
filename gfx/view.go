@@ -26,12 +26,17 @@ type Block struct {
 	index               int32
 }
 
+const EXTRA_SIZE = 8
+
+var ZERO_OFFSET [2]float32
+
 // BlockPos is a displayed Shape at a location
 type BlockPos struct {
 	model                  mgl32.Mat4
 	x, y, z                int
 	worldX, worldY, worldZ int
 	block                  *Block
+	extras                 [EXTRA_SIZE]*Block
 	dir                    shapes.Direction
 	animationTimer         float64
 	animationType          int
@@ -328,6 +333,9 @@ func (view *View) Load() {
 		blockPos.ScrollOffset[0] = 0
 		blockPos.ScrollOffset[1] = 0
 		view.origins[x][y][z] = nil
+		for i := 0; i < EXTRA_SIZE; i++ {
+			blockPos.extras[i] = nil
+		}
 
 		if z == 0 {
 			edge := view.edges[x][y]
@@ -345,6 +353,12 @@ func (view *View) Load() {
 		shapeIndex, hasShape := view.Loader.GetShape(worldX, worldY, worldZ)
 		if hasShape {
 			view.setShapeInner(worldX, worldY, worldZ, shapeIndex, true)
+		}
+		for i, shapeIndex := range view.Loader.GetExtras(worldX, worldY, worldZ) {
+			if i >= EXTRA_SIZE {
+				break
+			}
+			blockPos.extras[i] = view.blocks[shapeIndex]
 		}
 		if z == 0 {
 			shapeIndex, hasShape = view.Loader.GetEdge(worldX, worldY)
@@ -596,39 +610,53 @@ func (view *View) Draw(delta float64) {
 		blockPos := view.blockPos[x][y][z]
 		underShape := view.isUnderShape(x, y, z)
 		if blockPos.block != nil && z < view.maxZ && underShape {
-			blockPos.Draw(view)
+			blockPos.Draw(view, -1)
+		}
+		for i := 0; i < EXTRA_SIZE; i++ {
+			if blockPos.extras[i] == nil {
+				break
+			}
+			blockPos.Draw(view, i)
 		}
 
 		if z == 0 && underShape {
 			edge := view.edges[x][y]
 			if edge.block != nil {
-				edge.Draw(view)
+				edge.Draw(view, -1)
 			}
 		}
 	})
 	if view.Cursor.block != nil {
-		view.Cursor.Draw(view)
+		view.Cursor.Draw(view, -1)
 	}
 }
 
-func (b *BlockPos) Draw(view *View) {
-	if !state.init || state.texture != b.block.texture.texture {
-		gl.BindTexture(gl.TEXTURE_2D, b.block.texture.texture)
-		state.texture = b.block.texture.texture
+func (b *BlockPos) Draw(view *View, extraIndex int) {
+	block := b.block
+	if extraIndex > -1 {
+		block = b.extras[extraIndex]
 	}
-	if !state.init || state.vbo != b.block.vbo {
-		gl.BindBuffer(gl.ARRAY_BUFFER, b.block.vbo)
+	if !state.init || state.texture != block.texture.texture {
+		gl.BindTexture(gl.TEXTURE_2D, block.texture.texture)
+		state.texture = block.texture.texture
+	}
+	if !state.init || state.vbo != block.vbo {
+		gl.BindBuffer(gl.ARRAY_BUFFER, block.vbo)
 		gl.VertexAttribPointer(view.vertAttrib, 3, gl.FLOAT, false, 5*4, gl.PtrOffset(0))
 		gl.VertexAttribPointer(view.texCoordAttrib, 2, gl.FLOAT, false, 5*4, gl.PtrOffset(3*4))
-		state.vbo = b.block.vbo
+		state.vbo = block.vbo
 	}
 	gl.UniformMatrix4fv(view.modelUniform, 1, false, &b.model[0])
-	gl.Uniform2fv(view.modelScrollUniform, 1, &b.ScrollOffset[0])
-	gl.Uniform1f(view.alphaMinUniform, b.block.shape.AlphaMin)
+	if extraIndex == -1 {
+		gl.Uniform2fv(view.modelScrollUniform, 1, &b.ScrollOffset[0])
+	} else {
+		gl.Uniform2fv(view.modelScrollUniform, 1, &ZERO_OFFSET[0])
+	}
+	gl.Uniform1f(view.alphaMinUniform, block.shape.AlphaMin)
 	gl.Uniform1f(view.timeUniform, float32(state.time))
-	gl.Uniform1f(view.heightUniform, b.block.shape.Size[2])
+	gl.Uniform1f(view.heightUniform, block.shape.Size[2])
 	gl.Uniform1i(view.uniqueOffsetUniform, int32(b.worldX+b.worldY+b.worldZ))
-	if b.block.shape.SwayEnabled {
+	if block.shape.SwayEnabled {
 		gl.Uniform1i(view.swayEnabledUniform, 1)
 	} else {
 		gl.Uniform1i(view.swayEnabledUniform, 0)
@@ -636,7 +664,7 @@ func (b *BlockPos) Draw(view *View) {
 
 	animated := false
 	if b.dir != shapes.DIR_NONE {
-		if animation, ok := b.block.shape.Animations[b.animationType]; ok {
+		if animation, ok := block.shape.Animations[b.animationType]; ok {
 			b.incrAnimationStep(animation)
 			if steps, ok := animation.Tex[b.dir]; ok {
 				gl.Uniform1f(view.textureOffsetUniform, steps[animation.AnimationStep].TexOffset[0])

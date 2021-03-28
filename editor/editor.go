@@ -164,6 +164,13 @@ func (e *Editor) Events(delta float64, fadeDir int) {
 			return false
 		})
 	}
+	if e.app.IsFirstDown(glfw.KeyF) {
+		shapes.Shapes[e.shapeSelectorIndex].Traverse(func(xx, yy, zz int) bool {
+			e.app.Loader.EraseAllExtras(e.app.Loader.X+xx, e.app.Loader.Y+yy, e.Z+zz)
+			return false
+		})
+		changed = true
+	}
 
 	if e.app.IsFirstDown(glfw.KeyX) {
 		e.app.Loader.SaveAll()
@@ -232,7 +239,11 @@ func (e *Editor) setShape(x, y, z int, shape *shapes.Shape, skipEdge bool) {
 		y = (y / h) * h
 		z = 0
 	}
-	e.app.View.SetShape(x, y, z, e.shapeSelectorIndex)
+	if shape.IsExtra {
+		e.app.Loader.AddExtra(x, y, z, e.shapeSelectorIndex)
+	} else {
+		e.app.View.SetShape(x, y, z, e.shapeSelectorIndex)
+	}
 
 	if skipEdge {
 		e.app.View.ClearEdge(x, y)
