@@ -40,7 +40,12 @@ func (c *Calendar) FromEpoch() (mins, hours, day, month, year int) {
 
 func (c *Calendar) AsString() string {
 	mins, hours, day, month, year := c.FromEpoch()
-	return fmt.Sprintf("%d/%d/%d %d:%d", year, month, day, hours, mins)
+	return fmt.Sprintf("%04d/%02d/%02d %02d:%02d", year, month, day, hours, mins)
+}
+
+func (c *Calendar) AsTimeString() string {
+	mins, hours, _, _, _ := c.FromEpoch()
+	return fmt.Sprintf("%02d:%02d", hours, mins)
 }
 
 func toEpoch(mins, hours, day, month, year int) int {

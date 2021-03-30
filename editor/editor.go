@@ -13,6 +13,7 @@ import (
 	"github.com/go-gl/glfw/v3.3/glfw"
 	"github.com/uzudil/isongn/gfx"
 	"github.com/uzudil/isongn/shapes"
+	"github.com/uzudil/isongn/util"
 	"github.com/uzudil/isongn/world"
 )
 
@@ -58,7 +59,7 @@ func (e *Editor) Init(app *gfx.App, config map[string]interface{}) {
 	e.ctx = ctx
 
 	// create the editor bscript calls
-	e.editorCall = gfx.NewFunctionCall("editorCommand")
+	e.editorCall = util.NewFunctionCall("editorCommand")
 
 	// run the main method
 	_, err = ast.Evaluate(ctx)
@@ -167,6 +168,23 @@ func (e *Editor) Events(delta float64, fadeDir int) {
 	if e.app.IsFirstDown(glfw.KeyF) {
 		shapes.Shapes[e.shapeSelectorIndex].Traverse(func(xx, yy, zz int) bool {
 			e.app.Loader.EraseAllExtras(e.app.Loader.X+xx, e.app.Loader.Y+yy, e.Z+zz)
+			return false
+		})
+		changed = true
+	}
+	if e.app.IsFirstDown(glfw.KeyU) {
+		seen := map[string]bool{}
+		shapes.Shapes[e.shapeSelectorIndex].Traverse(func(xx, yy, zz int) bool {
+			if zz == 0 {
+				wx, wy, wz := e.app.Loader.X+xx, e.app.Loader.Y+yy, e.Z+zz-1
+				if shapeIndex, ox, oy, oz, ok := e.app.View.GetShape(wx, wy, wz); ok {
+					k := fmt.Sprintf("%d.%d.%d", ox, oy, oz)
+					if _, ok := seen[k]; !ok {
+						fmt.Printf("%s at %d,%d,%d\n", shapes.Shapes[shapeIndex].Name, ox, oy, oz)
+						seen[k] = true
+					}
+				}
+			}
 			return false
 		})
 		changed = true

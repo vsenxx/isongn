@@ -1,15 +1,39 @@
-package gfx
+package script
 
 import (
 	"fmt"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
 	"github.com/uzudil/bscript/bscript"
+	"github.com/uzudil/isongn/gfx"
+	"github.com/uzudil/isongn/runner"
 	"github.com/uzudil/isongn/shapes"
 )
 
+func getDateTime(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+	runner := ctx.App["runner"].(*runner.Runner)
+	return runner.Calendar.AsString(), nil
+}
+
+func getTime(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+	runner := ctx.App["runner"].(*runner.Runner)
+	return runner.Calendar.AsTimeString(), nil
+}
+
+func getCalendar(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+	runner := ctx.App["runner"].(*runner.Runner)
+	mins, hours, day, month, year := runner.Calendar.FromEpoch()
+	r := make([]interface{}, 5)
+	r[0] = float64(year)
+	r[1] = float64(month)
+	r[2] = float64(day)
+	r[3] = float64(hours)
+	r[4] = float64(mins)
+	return &r, nil
+}
+
 func saveGame(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
-	app := ctx.App["app"].(*App)
+	app := ctx.App["app"].(*gfx.App)
 	app.Loader.SaveAll()
 	return nil, nil
 }
@@ -27,7 +51,7 @@ func intersectsShapes(ctx *bscript.Context, arg ...interface{}) (interface{}, er
 	shapeA := shapes.Shapes[shapes.Names[nameA]]
 	shapeB := shapes.Shapes[shapes.Names[nameB]]
 
-	app := ctx.App["app"].(*App)
+	app := ctx.App["app"].(*gfx.App)
 
 	if intersects(x, x+int(shapeA.Size[0]), app.Loader.X, app.Loader.X+int(shapeB.Size[0])) &&
 		intersects(y, y+int(shapeA.Size[1]), app.Loader.Y, app.Loader.Y+int(shapeB.Size[1])) &&
@@ -40,7 +64,7 @@ func intersectsShapes(ctx *bscript.Context, arg ...interface{}) (interface{}, er
 func isInView(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	x := int(arg[0].(float64))
 	y := int(arg[1].(float64))
-	app := ctx.App["app"].(*App)
+	app := ctx.App["app"].(*gfx.App)
 	return app.View.Inside(x, y), nil
 }
 
@@ -50,7 +74,7 @@ func intersects(start, end, start2, end2 int) bool {
 
 func setMaxZ(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	f := int(arg[0].(float64))
-	app := ctx.App["app"].(*App)
+	app := ctx.App["app"].(*gfx.App)
 	app.View.SetMaxZ(int(f))
 	if roofName, ok := arg[1].(string); ok {
 		roof := shapes.Shapes[shapes.Names[roofName]]
@@ -70,7 +94,7 @@ func eraseShape(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	x := int(arg[0].(float64))
 	y := int(arg[1].(float64))
 	z := int(arg[2].(float64))
-	app := ctx.App["app"].(*App)
+	app := ctx.App["app"].(*gfx.App)
 	app.View.EraseShape(x, y, z)
 	return nil, nil
 }
@@ -80,7 +104,7 @@ func setShape(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	y := int(arg[1].(float64))
 	z := int(arg[2].(float64))
 	name := arg[3].(string)
-	app := ctx.App["app"].(*App)
+	app := ctx.App["app"].(*gfx.App)
 	app.View.SetShape(x, y, z, shapes.Names[name])
 	return nil, nil
 }
@@ -92,7 +116,7 @@ func moveShape(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	nx := int(arg[3].(float64))
 	ny := int(arg[4].(float64))
 	nz := int(arg[5].(float64))
-	app := ctx.App["app"].(*App)
+	app := ctx.App["app"].(*gfx.App)
 	app.View.MoveShape(x, y, z, nx, ny, nz)
 	return nil, nil
 }
@@ -103,7 +127,7 @@ func setOffset(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	z := int(arg[2].(float64))
 	sx := float32(arg[3].(float64))
 	sy := float32(arg[4].(float64))
-	app := ctx.App["app"].(*App)
+	app := ctx.App["app"].(*gfx.App)
 	app.View.SetOffset(x, y, z, sx, sy)
 	return nil, nil
 }
@@ -112,7 +136,7 @@ func setViewScroll(ctx *bscript.Context, arg ...interface{}) (interface{}, error
 	sx := float32(arg[0].(float64))
 	sy := float32(arg[1].(float64))
 	sz := float32(arg[2].(float64))
-	app := ctx.App["app"].(*App)
+	app := ctx.App["app"].(*gfx.App)
 	app.View.Scroll(sx, sy, sz)
 	return nil, nil
 }
@@ -124,7 +148,7 @@ func setAnimation(ctx *bscript.Context, arg ...interface{}) (interface{}, error)
 	name := arg[3].(string)
 	dir := arg[4].(float64)
 	animationSpeed := arg[5].(float64)
-	app := ctx.App["app"].(*App)
+	app := ctx.App["app"].(*gfx.App)
 	app.View.SetShapeAnimation(x, y, z, shapes.AnimationNames[name], shapes.Direction(dir), animationSpeed)
 	return nil, nil
 }
@@ -136,14 +160,14 @@ func fits(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	fx := int(arg[3].(float64))
 	fy := int(arg[4].(float64))
 	fz := int(arg[5].(float64))
-	app := ctx.App["app"].(*App)
+	app := ctx.App["app"].(*gfx.App)
 	return app.View.Fits(tx, ty, tz, fx, fy, fz), nil
 }
 
 func moveViewTo(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	x := int(arg[0].(float64))
 	y := int(arg[1].(float64))
-	app := ctx.App["app"].(*App)
+	app := ctx.App["app"].(*gfx.App)
 	app.Loader.MoveTo(x, y)
 	app.View.Load()
 	return nil, nil
@@ -152,7 +176,7 @@ func moveViewTo(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 func fadeViewTo(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	x := int(arg[0].(float64))
 	y := int(arg[1].(float64))
-	app := ctx.App["app"].(*App)
+	app := ctx.App["app"].(*gfx.App)
 	app.FadeOut(func() {
 		app.FadeIn(func() {
 			app.FadeDone()
@@ -173,7 +197,7 @@ func getShape(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	x := int(arg[0].(float64))
 	y := int(arg[1].(float64))
 	z := int(arg[2].(float64))
-	app := ctx.App["app"].(*App)
+	app := ctx.App["app"].(*gfx.App)
 	if shapeIndex, ox, oy, oz, found := app.View.GetShape(x, y, z); found {
 		r := make([]interface{}, 4)
 		r[0] = shapes.Shapes[shapeIndex].Name
@@ -187,7 +211,7 @@ func getShape(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 
 func getPosition(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	r := make([]interface{}, 3)
-	app := ctx.App["app"].(*App)
+	app := ctx.App["app"].(*gfx.App)
 	r[0] = float64(app.Loader.X)
 	r[1] = float64(app.Loader.Y)
 	r[2] = float64(app.Game.GetZ())
@@ -198,7 +222,7 @@ func isPressed(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	a, ok := arg[0].(float64)
 	if ok {
 		key := glfw.Key(int(a))
-		app := ctx.App["app"].(*App)
+		app := ctx.App["app"].(*gfx.App)
 		return app.IsFirstDown(key), nil
 	}
 	return nil, fmt.Errorf("%s unable to parse key at", ctx.Pos)
@@ -211,27 +235,39 @@ func addMessage(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	r := uint8(arg[3].(float64))
 	g := uint8(arg[4].(float64))
 	b := uint8(arg[5].(float64))
-	app := ctx.App["app"].(*App)
+	app := ctx.App["app"].(*gfx.App)
 	index := app.Game.AddMessage(x, y, message, r, g, b)
 	return float64(index), nil
 }
 
 func delMessage(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	index := int(arg[0].(float64))
-	app := ctx.App["app"].(*App)
+	app := ctx.App["app"].(*gfx.App)
 	app.Game.DelMessage(index)
 	return nil, nil
 }
 
 func messageWidth(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	message := arg[0].(string)
-	app := ctx.App["app"].(*App)
+	app := ctx.App["app"].(*gfx.App)
 	return float64(app.Font.Width(message)), nil
+}
+
+func getScreenPos(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+	x := int(arg[0].(float64))
+	y := int(arg[1].(float64))
+	z := int(arg[2].(float64))
+	app := ctx.App["app"].(*gfx.App)
+	sx, sy := app.GetScreenPos(x, y, z)
+	r := make([]interface{}, 2)
+	r[0] = float64(sx)
+	r[1] = float64(sy)
+	return &r, nil
 }
 
 func isDown(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	key := glfw.Key(arg[0].(float64))
-	app := ctx.App["app"].(*App)
+	app := ctx.App["app"].(*gfx.App)
 	return app.IsDown(key), nil
 }
 
@@ -395,108 +431,11 @@ func InitScript() {
 	bscript.AddBuiltin("addMessage", addMessage)
 	bscript.AddBuiltin("delMessage", delMessage)
 	bscript.AddBuiltin("messageWidth", messageWidth)
+	bscript.AddBuiltin("getDateTime", getDateTime)
+	bscript.AddBuiltin("getTime", getTime)
+	bscript.AddBuiltin("getCalendar", getCalendar)
+	bscript.AddBuiltin("getScreenPos", getScreenPos)
 	for k, v := range constants {
 		bscript.AddConstant(k, v)
 	}
-}
-
-func NewFunctionCall(functionName string, values ...*bscript.Value) *bscript.Variable {
-	args := make([]*bscript.Expression, len(values))
-	for i, v := range values {
-		args[i] = &bscript.Expression{
-			BoolTerm: &bscript.BoolTerm{
-				Left: &bscript.Cmp{
-					Left: &bscript.Term{
-						Left: &bscript.Factor{
-							Base: v,
-						},
-					},
-				},
-			},
-		}
-	}
-
-	return &bscript.Variable{
-		Variable: functionName,
-		Suffixes: []*bscript.VariableSuffix{
-			{
-				CallParams: &bscript.CallParams{
-					Args: args,
-				},
-			},
-		},
-	}
-}
-
-var trueValue string = "true"
-var falseValue string = "false"
-
-func toValue(v interface{}) *bscript.Value {
-	value := &bscript.Value{}
-	if f, ok := v.(float64); ok {
-		value.Number = &bscript.SignedNumber{}
-		value.Number.Number = f
-	} else {
-		if s, ok := v.(string); ok {
-			value.String = &s
-		} else {
-			if b, ok := v.(bool); ok {
-				if b {
-					value.Boolean = &trueValue
-				} else {
-					value.Boolean = &falseValue
-				}
-			} else {
-				if a, ok := v.(*([]interface{})); ok {
-					value.Array = &bscript.Array{}
-					for _, e := range *a {
-						expr := toExpression(toValue(e))
-						if value.Array.LeftValue == nil {
-							value.Array.LeftValue = expr
-						} else {
-							value.Array.RightValues = append(value.Array.RightValues, expr)
-						}
-					}
-				} else {
-					if m, ok := v.(map[string]interface{}); ok {
-						value.Map = ToBscriptMap(m)
-					} else {
-						panic(fmt.Sprintf("Don't know how to convert value type: %v", v))
-					}
-				}
-			}
-		}
-	}
-	return value
-}
-
-func toExpression(value *bscript.Value) *bscript.Expression {
-	return &bscript.Expression{
-		BoolTerm: &bscript.BoolTerm{
-			Left: &bscript.Cmp{
-				Left: &bscript.Term{
-					Left: &bscript.Factor{
-						Base: value,
-					},
-				},
-			},
-		},
-	}
-}
-
-func ToBscriptMap(d map[string]interface{}) *bscript.Map {
-	m := &bscript.Map{}
-	for k, v := range d {
-		expr := toExpression(toValue(v))
-		nvp := &bscript.NameValuePair{
-			Name:  k,
-			Value: expr,
-		}
-		if m.LeftNameValuePair == nil {
-			m.LeftNameValuePair = nvp
-		} else {
-			m.RightNameValuePairs = append(m.RightNameValuePairs, nvp)
-		}
-	}
-	return m
 }

@@ -110,7 +110,6 @@ func NewApp(game Game, gameDir string, windowWidth, windowHeight int, targetFps 
 	app.Window.SetScrollCallback(app.MouseScroll)
 	app.frameBuffer = NewFrameBuffer(int32(width), int32(height), true)
 	app.uiFrameBuffer = NewFrameBuffer(int32(width), int32(height), false)
-	InitScript()
 	err = shapes.InitShapes(gameDir, appConfig.shapes)
 	if err != nil {
 		panic(err)
@@ -123,6 +122,15 @@ func NewApp(game Game, gameDir string, windowWidth, windowHeight int, targetFps 
 	app.View = InitView(appConfig.zoom, appConfig.camera, appConfig.shear, app.Loader)
 	app.Ui = InitUi(width, height)
 	return app
+}
+
+func (app *App) GetScreenPos(x, y, z int) (int, int) {
+	if vx, vy, vz, ok := app.View.toViewPos(x, y, z); ok {
+		// todo: make this formula work for other configs... is this the right place for this?
+		return app.Width - (vx/2+vy/2)*8, (vx/2 + vy/2 - vz) * 8
+	}
+	// offscreen
+	return -1000, -1000
 }
 
 func parseConfig(gameDir string) *AppConfig {

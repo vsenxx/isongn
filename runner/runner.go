@@ -6,6 +6,7 @@ import (
 
 	"github.com/uzudil/bscript/bscript"
 	"github.com/uzudil/isongn/gfx"
+	"github.com/uzudil/isongn/util"
 	"github.com/uzudil/isongn/world"
 )
 
@@ -64,7 +65,8 @@ func (runner *Runner) Init(app *gfx.App, config map[string]interface{}) {
 		filepath.Join(app.Config.GameDir, "src", "runner"),
 		false,
 		map[string]interface{}{
-			"app": app,
+			"app":    app,
+			"runner": runner,
 		},
 	)
 	if err != nil {
@@ -75,16 +77,16 @@ func (runner *Runner) Init(app *gfx.App, config map[string]interface{}) {
 
 	runner.deltaArg = &bscript.Value{Number: &bscript.SignedNumber{}}
 	runner.fadeDirArg = &bscript.Value{Number: &bscript.SignedNumber{}}
-	runner.eventsCall = gfx.NewFunctionCall("events", runner.deltaArg, runner.fadeDirArg)
+	runner.eventsCall = util.NewFunctionCall("events", runner.deltaArg, runner.fadeDirArg)
 
 	runner.sectionLoadXArg = &bscript.Value{Number: &bscript.SignedNumber{}}
 	runner.sectionLoadYArg = &bscript.Value{Number: &bscript.SignedNumber{}}
 	runner.sectionLoadDataArg = &bscript.Value{}
-	runner.sectionLoadCall = gfx.NewFunctionCall("onSectionLoad", runner.sectionLoadXArg, runner.sectionLoadYArg, runner.sectionLoadDataArg)
+	runner.sectionLoadCall = util.NewFunctionCall("onSectionLoad", runner.sectionLoadXArg, runner.sectionLoadYArg, runner.sectionLoadDataArg)
 
 	runner.sectionSaveXArg = &bscript.Value{Number: &bscript.SignedNumber{}}
 	runner.sectionSaveYArg = &bscript.Value{Number: &bscript.SignedNumber{}}
-	runner.sectionSaveCall = gfx.NewFunctionCall("beforeSectionSave", runner.sectionSaveXArg, runner.sectionSaveYArg)
+	runner.sectionSaveCall = util.NewFunctionCall("beforeSectionSave", runner.sectionSaveXArg, runner.sectionSaveYArg)
 
 	// run the main method
 	_, err = ast.Evaluate(ctx)
@@ -111,7 +113,7 @@ func (runner *Runner) GetZ() int {
 func (runner *Runner) SectionLoad(x, y int, data map[string]interface{}) {
 	runner.sectionLoadXArg.Number.Number = float64(x)
 	runner.sectionLoadYArg.Number.Number = float64(y)
-	runner.sectionLoadDataArg.Map = gfx.ToBscriptMap(data)
+	runner.sectionLoadDataArg.Map = util.ToBscriptMap(data)
 	runner.sectionLoadCall.Evaluate(runner.ctx)
 }
 

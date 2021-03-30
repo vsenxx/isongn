@@ -45,6 +45,7 @@ type BlockPos struct {
 }
 
 type View struct {
+	width, height        int
 	Loader               *world.Loader
 	projection, camera   mgl32.Mat4
 	program              uint32

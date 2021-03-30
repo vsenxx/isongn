@@ -16,6 +16,7 @@ import (
 	"github.com/uzudil/isongn/editor"
 	"github.com/uzudil/isongn/gfx"
 	"github.com/uzudil/isongn/runner"
+	"github.com/uzudil/isongn/script"
 )
 
 func init() {
@@ -47,6 +48,7 @@ func main() {
 		fmt.Println("mode must be 'runner' or 'editor'")
 		os.Exit(1)
 	}
+	script.InitScript()
 	app := gfx.NewApp(game, *gameDir, *winWidth, *winHeight, *fps)
 	app.Run()
 }
