@@ -31,6 +31,7 @@ type Runner struct {
 	messages           map[int]*Message
 	messageIndex       int
 	updateOverlay      bool
+	Calendar           *Calendar
 }
 
 func NewRunner() *Runner {
@@ -41,6 +42,19 @@ func NewRunner() *Runner {
 
 func (runner *Runner) Init(app *gfx.App, config map[string]interface{}) {
 	runner.app = app
+	if cal, ok := config["calendar"].(map[string]interface{}); ok {
+		runner.Calendar = NewCalendar(
+			int(cal["min"].(float64)),
+			int(cal["hour"].(float64)),
+			int(cal["day"].(float64)),
+			int(cal["month"].(float64)),
+			int(cal["year"].(float64)),
+			cal["incrementSpeed"].(float64),
+		)
+	} else {
+		runner.Calendar = NewCalendar(0, 9, 1, 5, 1992, 0.1)
+	}
+
 	runner.app.Loader.SetIoMode(world.RUNNER_MODE)
 
 	runner.app.Ui.AddBg(0, 0, int(runner.app.Width), int(runner.app.Height), color.Transparent, runner.overlayContents)
@@ -84,6 +98,7 @@ func (runner *Runner) Name() string {
 }
 
 func (runner *Runner) Events(delta float64, fadeDir int) {
+	runner.Calendar.Incr(delta)
 	runner.deltaArg.Number.Number = delta
 	runner.fadeDirArg.Number.Number = float64(fadeDir)
 	runner.eventsCall.Evaluate(runner.ctx)
