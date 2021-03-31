@@ -23,8 +23,6 @@ type Game interface {
 	Name() string
 	Events(delta float64, fadeDir int)
 	GetZ() int
-	AddMessage(x, y int, message string, r, g, b uint8) int
-	DelMessage(int)
 }
 
 type KeyPress struct {
@@ -125,9 +123,8 @@ func NewApp(game Game, gameDir string, windowWidth, windowHeight int, targetFps 
 }
 
 func (app *App) GetScreenPos(x, y, z int) (int, int) {
-	if vx, vy, vz, ok := app.View.toViewPos(x, y, z); ok {
-		// todo: make this formula work for other configs... is this the right place for this?
-		return app.Width - (vx/2+vy/2)*8, (vx/2 + vy/2 - vz) * 8
+	if sx, sy, ok := app.View.toScreenPos(x, y, z, app.Width, app.Height); ok {
+		return sx, sy
 	}
 	// offscreen
 	return -1000, -1000

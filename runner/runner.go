@@ -16,6 +16,15 @@ type Message struct {
 	fg      color.Color
 }
 
+type PositionMessage struct {
+	worldX, worldY, worldZ int
+	message                string
+	fg                     color.Color
+	ttl                    float64
+	ui                     *gfx.Panel
+	init                   bool
+}
+
 type Runner struct {
 	app                *gfx.App
 	ctx                *bscript.Context
@@ -33,11 +42,13 @@ type Runner struct {
 	messageIndex       int
 	updateOverlay      bool
 	Calendar           *Calendar
+	positionMessages   []*PositionMessage
 }
 
 func NewRunner() *Runner {
 	return &Runner{
-		messages: map[int]*Message{},
+		messages:         map[int]*Message{},
+		positionMessages: []*PositionMessage{},
 	}
 }
 
@@ -101,6 +112,7 @@ func (runner *Runner) Name() string {
 
 func (runner *Runner) Events(delta float64, fadeDir int) {
 	runner.Calendar.Incr(delta)
+	runner.timeoutMessages(delta)
 	runner.deltaArg.Number.Number = delta
 	runner.fadeDirArg.Number.Number = float64(fadeDir)
 	runner.eventsCall.Evaluate(runner.ctx)
@@ -128,17 +140,21 @@ func (runner *Runner) overlayContents(panel *gfx.Panel) bool {
 	if runner.updateOverlay {
 		panel.Clear()
 		for _, msg := range runner.messages {
-			for xx := -1; xx <= 1; xx++ {
-				for yy := -1; yy <= 1; yy++ {
-					runner.app.Font.Printf(panel.Rgba, color.Black, msg.x+xx, msg.y+yy, msg.message)
-				}
-			}
-			runner.app.Font.Printf(panel.Rgba, msg.fg, msg.x, msg.y, msg.message)
+			runner.printOutlineMessage(panel, msg.x, msg.y, msg.message, msg.fg)
 		}
 		runner.updateOverlay = false
 		return true
 	}
 	return false
+}
+
+func (runner *Runner) printOutlineMessage(panel *gfx.Panel, x, y int, message string, fg color.Color) {
+	for xx := -1; xx <= 1; xx++ {
+		for yy := -1; yy <= 1; yy++ {
+			runner.app.Font.Printf(panel.Rgba, color.Black, x+xx, y+yy, message)
+		}
+	}
+	runner.app.Font.Printf(panel.Rgba, fg, x, y, message)
 }
 
 func (runner *Runner) AddMessage(x, y int, message string, r, g, b uint8) int {
@@ -151,4 +167,43 @@ func (runner *Runner) AddMessage(x, y int, message string, r, g, b uint8) int {
 func (runner *Runner) DelMessage(messageIndex int) {
 	delete(runner.messages, messageIndex)
 	runner.updateOverlay = true
+}
+
+// todo: PositionMessage-s should be vbo-s instead of using the cpu to recalc their positions
+const MESSAGE_TTL = 2
+
+func (runner *Runner) ShowMessageAt(worldX, worldY, worldZ int, message string, r, g, b uint8) {
+	m := &PositionMessage{
+		worldX:  worldX,
+		worldY:  worldY,
+		worldZ:  worldZ,
+		message: message,
+		fg:      color.RGBA{r, g, b, 255},
+		ttl:     MESSAGE_TTL,
+	}
+	runner.positionMessages = append(runner.positionMessages, m)
+	x, y := runner.app.GetScreenPos(worldX, worldY, worldZ)
+	w := runner.app.Font.Width(message)
+	m.ui = runner.app.Ui.AddBg(x, y, int(w), runner.app.Font.Height, color.Transparent, func(panel *gfx.Panel) bool {
+		if m.init == false {
+			panel.Clear()
+			runner.printOutlineMessage(panel, 0, int(float32(runner.app.Font.Height)*0.75), m.message, m.fg)
+			m.init = true
+			return true
+		}
+		return false
+	})
+}
+
+func (runner *Runner) timeoutMessages(delta float64) {
+	for i, m := range runner.positionMessages {
+		m.ttl -= delta
+		if m.ttl <= 0 {
+			runner.app.Ui.Remove(m.ui)
+			runner.positionMessages = append(runner.positionMessages[:i], runner.positionMessages[i+1:]...)
+			return
+		}
+		x, y := runner.app.GetScreenPos(m.worldX, m.worldY, m.worldZ)
+		runner.app.Ui.MovePanel(m.ui, x, y)
+	}
 }

@@ -71,6 +71,18 @@ func (ui *Ui) AddBg(x, y, w, h int, bg color.Color, renderer func(*Panel) bool) 
 	return panel
 }
 
+func (ui *Ui) Remove(panel *Panel) {
+	gl.DeleteTextures(1, &panel.texture)
+	gl.DeleteBuffers(1, &panel.vbo)
+	for index, p := range ui.panels {
+		if p == panel {
+			ui.panels = append(ui.panels[:index], ui.panels[index+1:]...)
+			return
+		}
+	}
+	print("Couldn't find panel in ui list!")
+}
+
 func (ui *Ui) NewPanel(x, y, w, h int, bg color.Color, renderer func(*Panel) bool) *Panel {
 	panel := &Panel{
 		X:          x,
@@ -109,19 +121,7 @@ func (ui *Ui) NewPanel(x, y, w, h int, bg color.Color, renderer func(*Panel) boo
 		gl.UNSIGNED_BYTE,
 		gl.Ptr(panel.Rgba.Pix))
 
-	fx := float32(x)
-	fy := float32(y)
-	fw := float32(w)
-	fh := float32(h)
-	panel.model = mgl32.Ident4()
-	// translate to position
-	panel.model.Set(0, 3, (fx*2-(ui.ScreenWidth-fw))/ui.ScreenWidth)
-	panel.model.Set(1, 3, ((ui.ScreenHeight-fh)-fy*2)/ui.ScreenHeight)
-	panel.model.Set(2, 3, 0)
-	// scale
-	panel.model.Set(0, 0, fw/ui.ScreenWidth)
-	panel.model.Set(1, 1, fh/ui.ScreenHeight)
-	panel.model.Set(2, 2, 1)
+	ui.calcModel(panel)
 
 	gl.BindVertexArray(ui.vao)
 
@@ -138,6 +138,28 @@ func (ui *Ui) NewPanel(x, y, w, h int, bg color.Color, renderer func(*Panel) boo
 	gl.BufferData(gl.ARRAY_BUFFER, len(verts)*4, gl.Ptr(verts), gl.STATIC_DRAW)
 
 	return panel
+}
+
+func (ui *Ui) calcModel(panel *Panel) {
+	fx := float32(panel.X)
+	fy := float32(panel.Y)
+	fw := float32(panel.W)
+	fh := float32(panel.H)
+	panel.model = mgl32.Ident4()
+	// translate to position
+	panel.model.Set(0, 3, (fx*2-(ui.ScreenWidth-fw))/ui.ScreenWidth)
+	panel.model.Set(1, 3, ((ui.ScreenHeight-fh)-fy*2)/ui.ScreenHeight)
+	panel.model.Set(2, 3, 0)
+	// scale
+	panel.model.Set(0, 0, fw/ui.ScreenWidth)
+	panel.model.Set(1, 1, fh/ui.ScreenHeight)
+	panel.model.Set(2, 2, 1)
+}
+
+func (ui *Ui) MovePanel(panel *Panel, x, y int) {
+	panel.X = x
+	panel.Y = y
+	ui.calcModel(panel)
 }
 
 func (p *Panel) Clear() {

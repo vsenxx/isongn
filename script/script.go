@@ -228,6 +228,19 @@ func isPressed(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	return nil, fmt.Errorf("%s unable to parse key at", ctx.Pos)
 }
 
+func showMessageAt(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+	worldX := int(arg[0].(float64))
+	worldY := int(arg[1].(float64))
+	worldZ := int(arg[2].(float64))
+	message := arg[3].(string)
+	r := uint8(arg[4].(float64))
+	g := uint8(arg[5].(float64))
+	b := uint8(arg[6].(float64))
+	runner := ctx.App["runner"].(*runner.Runner)
+	runner.ShowMessageAt(worldX, worldY, worldZ, message, r, g, b)
+	return nil, nil
+}
+
 func addMessage(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	x := int(arg[0].(float64))
 	y := int(arg[1].(float64))
@@ -235,15 +248,15 @@ func addMessage(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	r := uint8(arg[3].(float64))
 	g := uint8(arg[4].(float64))
 	b := uint8(arg[5].(float64))
-	app := ctx.App["app"].(*gfx.App)
-	index := app.Game.AddMessage(x, y, message, r, g, b)
+	runner := ctx.App["runner"].(*runner.Runner)
+	index := runner.AddMessage(x, y, message, r, g, b)
 	return float64(index), nil
 }
 
 func delMessage(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	index := int(arg[0].(float64))
-	app := ctx.App["app"].(*gfx.App)
-	app.Game.DelMessage(index)
+	runner := ctx.App["runner"].(*runner.Runner)
+	runner.DelMessage(index)
 	return nil, nil
 }
 
@@ -428,6 +441,7 @@ func InitScript() {
 	bscript.AddBuiltin("isInView", isInView)
 	bscript.AddBuiltin("saveGame", saveGame)
 	bscript.AddBuiltin("loadGame", loadGame)
+	bscript.AddBuiltin("showMessageAt", showMessageAt)
 	bscript.AddBuiltin("addMessage", addMessage)
 	bscript.AddBuiltin("delMessage", delMessage)
 	bscript.AddBuiltin("messageWidth", messageWidth)

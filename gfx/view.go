@@ -379,6 +379,27 @@ func (view *View) toViewPos(worldX, worldY, worldZ int) (int, int, int, bool) {
 	return viewX, viewY, worldZ, !invalidPos
 }
 
+func (view *View) toScreenPos(worldX, worldY, worldZ int, viewWidth, viewHeight int) (int, int, bool) {
+	if viewX, viewY, viewZ, ok := view.toViewPos(worldX, worldY, worldZ); ok {
+		pt := mgl32.Vec4{
+			float32(viewX-SIZE/2) - view.ScrollOffset[0],
+			float32(viewY-SIZE/2) - view.ScrollOffset[1],
+			float32(viewZ) - view.ScrollOffset[2],
+			1,
+		}
+		clipSpace := view.projection.Mul4(view.camera).Mul4x1(pt)
+		ndcPos := clipSpace.Mul(1 / clipSpace.W()).Vec3()
+		vw := float32(viewWidth)
+		vh := float32(viewHeight)
+		windowSpace := mgl32.Vec2{
+			(ndcPos.X() + 1) / 2 * vw,
+			((vh / vw) - ndcPos.Y()) / 2 * vw, // no idea why but this works
+		}
+		return int(windowSpace.X()), int(windowSpace.Y()), true
+	}
+	return 0, 0, false
+}
+
 func (view *View) Inside(worldX, worldY int) bool {
 	vx, vy, _, validPos := view.toViewPos(worldX, worldY, 1)
 	return validPos && vx >= VIEW_BORDER && vx < SIZE-VIEW_BORDER && vy >= VIEW_BORDER && vy < SIZE-VIEW_BORDER

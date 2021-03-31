@@ -32,7 +32,8 @@ type character struct {
 }
 
 type Font struct {
-	chars []*character
+	chars  []*character
+	Height int
 }
 
 func NewFont(fontPath string, scale int) (*Font, error) {
@@ -58,7 +59,9 @@ func NewFont(fontPath string, scale int) (*Font, error) {
 		return nil, err
 	}
 
-	f := &Font{}
+	f := &Font{
+		Height: scale,
+	}
 	f.chars = make([]*character, 0, highChar-lowChar+1)
 	for ch := lowChar; ch <= highChar; ch++ {
 		char, err := newChar(ttf, ch, scale)
