@@ -1,8 +1,10 @@
 package runner
 
 import (
+	"fmt"
 	"image/color"
 	"path/filepath"
+	"strconv"
 
 	"github.com/uzudil/bscript/bscript"
 	"github.com/uzudil/isongn/gfx"
@@ -43,12 +45,18 @@ type Runner struct {
 	updateOverlay      bool
 	Calendar           *Calendar
 	positionMessages   []*PositionMessage
+	daylight           [24][3]float32
 }
 
 func NewRunner() *Runner {
+	daylight := [24][3]float32{}
+	for i := 0; i < 24; i++ {
+		daylight[i] = [3]float32{255, 255, 255}
+	}
 	return &Runner{
 		messages:         map[int]*Message{},
 		positionMessages: []*PositionMessage{},
+		daylight:         daylight,
 	}
 }
 
@@ -63,9 +71,27 @@ func (runner *Runner) Init(app *gfx.App, config map[string]interface{}) {
 			int(cal["year"].(float64)),
 			cal["incrementSpeed"].(float64),
 		)
+
+		if daylight, ok := cal["daylight"].(map[string]interface{}); ok {
+			for k, v := range daylight {
+				hour, err := strconv.Atoi(k)
+				if err != nil {
+					fmt.Printf("Error parsing daylight hour: %v\n", err)
+				} else {
+					if hour >= 0 && hour < 24 {
+						rgb := v.([]interface{})
+						r := util.Clamp(float32(rgb[0].(float64)), 0, 255)
+						g := util.Clamp(float32(rgb[1].(float64)), 0, 255)
+						b := util.Clamp(float32(rgb[2].(float64)), 0, 255)
+						runner.daylight[hour] = [3]float32{r, g, b}
+					}
+				}
+			}
+		}
 	} else {
 		runner.Calendar = NewCalendar(0, 9, 1, 5, 1992, 0.1)
 	}
+	runner.Calendar.EventListener = runner
 
 	runner.app.Loader.SetIoMode(world.RUNNER_MODE)
 
@@ -206,4 +232,20 @@ func (runner *Runner) timeoutMessages(delta float64) {
 		x, y := runner.app.GetScreenPos(m.worldX, m.worldY, m.worldZ)
 		runner.app.Ui.MovePanel(m.ui, x, y)
 	}
+}
+
+func (runner *Runner) MinsChange(mins, hours, day, month, year int) {
+	nowColor := runner.daylight[hours]
+	nextHour := hours + 1
+	if nextHour >= 24 {
+		nextHour -= 24
+	}
+	nextColor := runner.daylight[nextHour]
+	percent := float32(mins) / 60.0
+	runner.app.View.SetDaylight(
+		util.Linear(nowColor[0], nextColor[0], percent),
+		util.Linear(nowColor[1], nextColor[1], percent),
+		util.Linear(nowColor[2], nextColor[2], percent),
+		255,
+	)
 }

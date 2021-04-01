@@ -2,6 +2,7 @@ package util
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/uzudil/bscript/bscript"
 )
@@ -105,4 +106,12 @@ func ToBscriptMap(d map[string]interface{}) *bscript.Map {
 		}
 	}
 	return m
+}
+
+func Linear(a, b, percent float32) float32 {
+	return a + (b-a)*percent
+}
+
+func Clamp(value, min, max float32) float32 {
+	return float32(math.Max(float64(min), math.Min(float64(value), float64(max))))
 }

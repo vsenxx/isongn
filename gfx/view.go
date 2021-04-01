@@ -55,6 +55,7 @@ type View struct {
 	textureUniform       int32
 	textureOffsetUniform int32
 	alphaMinUniform      int32
+	daylightUniform      int32
 	viewScrollUniform    int32
 	modelScrollUniform   int32
 	timeUniform          int32
@@ -75,6 +76,7 @@ type View struct {
 	ScrollOffset         [3]float32
 	maxZ                 int
 	underShape           *shapes.Shape
+	daylight             [4]float32
 }
 
 const viewSize = 10
@@ -99,10 +101,11 @@ func InitView(zoom float64, camera, shear [3]float32, loader *world.Loader) *Vie
 	}
 
 	view := &View{
-		zoom:   zoom,
-		shear:  shear,
-		Loader: loader,
-		maxZ:   world.SECTION_Z_SIZE,
+		zoom:     zoom,
+		shear:    shear,
+		Loader:   loader,
+		maxZ:     world.SECTION_Z_SIZE,
+		daylight: [4]float32{1, 1, 1, 1},
 	}
 	view.projection = getProjection(float32(view.zoom), view.shear)
 
@@ -128,6 +131,7 @@ func InitView(zoom float64, camera, shear [3]float32, loader *world.Loader) *Vie
 	view.textureUniform = gl.GetUniformLocation(view.program, gl.Str("tex\x00"))
 	view.textureOffsetUniform = gl.GetUniformLocation(view.program, gl.Str("textureOffset\x00"))
 	view.alphaMinUniform = gl.GetUniformLocation(view.program, gl.Str("alphaMin\x00"))
+	view.daylightUniform = gl.GetUniformLocation(view.program, gl.Str("daylight\x00"))
 	gl.BindFragDataLocation(view.program, 0, gl.Str("outputColor\x00"))
 	view.vertAttrib = uint32(gl.GetAttribLocation(view.program, gl.Str("vert\x00")))
 	view.texCoordAttrib = uint32(gl.GetAttribLocation(view.program, gl.Str("vertTexCoord\x00")))
@@ -625,6 +629,7 @@ func (view *View) Draw(delta float64) {
 	gl.EnableVertexAttribArray(view.vertAttrib)
 	gl.EnableVertexAttribArray(view.texCoordAttrib)
 	gl.Uniform3fv(view.viewScrollUniform, 1, &view.ScrollOffset[0])
+	gl.Uniform4fv(view.daylightUniform, 1, &view.daylight[0])
 	state.delta = delta
 	state.time += delta
 	state.init = false
@@ -720,6 +725,13 @@ func (view *View) Zoom(zoom float64) {
 	gl.UniformMatrix4fv(view.projectionUniform, 1, false, &view.projection[0])
 }
 
+func (view *View) SetDaylight(r, g, b, a float32) {
+	view.daylight[0] = r / 255
+	view.daylight[1] = g / 255
+	view.daylight[2] = b / 255
+	view.daylight[3] = 1
+}
+
 var vertexShader = `
 #version 330
 uniform mat4 projection;
@@ -765,6 +777,7 @@ var fragmentShader = `
 #version 330
 uniform sampler2D tex;
 uniform float alphaMin;
+uniform vec4 daylight;
 in vec2 fragTexCoord;
 layout(location = 0) out vec4 outputColor;
 void main() {
@@ -772,6 +785,6 @@ void main() {
 	if (val.a < alphaMin) {
 		discard;
 	}
-	outputColor = val;
+	outputColor = val * daylight;
 }
 ` + "\x00"

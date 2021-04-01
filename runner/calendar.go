@@ -2,13 +2,18 @@ package runner
 
 import "fmt"
 
+type CalendarUpdate interface {
+	MinsChange(mins, hours, day, month, year int)
+}
+
 type Calendar struct {
 	MinsSinceEpoch  int
 	incSpeed, ticks float64
+	EventListener   CalendarUpdate
 }
 
 func NewCalendar(mins, hours, day, month, year int, incSpeed float64) *Calendar {
-	return &Calendar{toEpoch(mins, hours, day, month, year), incSpeed, 0}
+	return &Calendar{toEpoch(mins, hours, day, month, year), incSpeed, 0, nil}
 }
 
 func (c *Calendar) Incr(delta float64) {
@@ -16,8 +21,8 @@ func (c *Calendar) Incr(delta float64) {
 	if c.ticks >= c.incSpeed {
 		c.ticks = 0
 		c.MinsSinceEpoch++
-		if c.MinsSinceEpoch%100 == 0 {
-			fmt.Printf("%s\n", c.AsString())
+		if c.EventListener != nil {
+			c.EventListener.MinsChange(c.FromEpoch())
 		}
 	}
 }
