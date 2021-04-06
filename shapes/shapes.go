@@ -41,22 +41,24 @@ type Animation struct {
 const alphaMinDefault = 0.35
 
 type Shape struct {
-	Index         int
-	Name          string
-	Group         int
-	Image         *image.RGBA
-	Size          [3]float32
-	Tex           *TextureCoords
-	Fudge         float32
-	AlphaMin      float32
-	ImageIndex    int
-	ShapeMeta     *ShapeMeta
-	Edges         map[string]map[string][]*Shape
-	Offset        [3]float32
-	EditorVisible bool
-	Animations    map[int]*Animation
-	SwayEnabled   bool
-	IsExtra       bool
+	Index          int
+	Name           string
+	Group          int
+	Image          *image.RGBA
+	Size           [3]float32
+	Tex            *TextureCoords
+	Fudge          float32
+	AlphaMin       float32
+	ImageIndex     int
+	ShapeMeta      *ShapeMeta
+	Edges          map[string]map[string][]*Shape
+	Offset         [3]float32
+	EditorVisible  bool
+	Animations     map[int]*Animation
+	SwayEnabled    bool
+	BobEnabled     bool
+	BreatheEnabled bool
+	IsExtra        bool
 }
 
 var Shapes []*Shape
@@ -161,15 +163,7 @@ func appendShape(index int, name string, shapeDef map[string]interface{}, imageI
 		shapeMeta,
 		offset,
 	)
-
-	// sway
-	if sway, ok := shapeDef["sway"].(bool); ok {
-		shape.SwayEnabled = sway
-	}
-	// extra
-	if extra, ok := shapeDef["extra"].(bool); ok {
-		shape.IsExtra = extra
-	}
+	shape.addExtras(shapeDef)
 
 	// edges
 	refName, ok := shapeDef["ref"]
@@ -203,6 +197,24 @@ func appendShape(index int, name string, shapeDef map[string]interface{}, imageI
 	// add shape
 	Shapes = append(Shapes, shape)
 	Names[name] = shape.Index
+}
+
+func (shape *Shape) addExtras(shapeDef map[string]interface{}) {
+	// sway
+	if sway, ok := shapeDef["sway"].(bool); ok {
+		shape.SwayEnabled = sway
+	}
+	// bob
+	if bob, ok := shapeDef["bob"].(bool); ok {
+		shape.BobEnabled = bob
+	}
+	if bob, ok := shapeDef["breathe"].(bool); ok {
+		shape.BreatheEnabled = bob
+	}
+	// extra
+	if extra, ok := shapeDef["extra"].(bool); ok {
+		shape.IsExtra = extra
+	}
 }
 
 func (shape *Shape) HasEdges(shapeName string) bool {
@@ -301,6 +313,7 @@ func InitCreatures(gameDir string, data []map[string]interface{}) error {
 			Animations: map[int]*Animation{},
 			AlphaMin:   alphaMinDefault,
 		}
+		shape.addExtras(block)
 
 		// add a gap, if needed
 		for len(Shapes) < shape.Index {

@@ -45,38 +45,40 @@ type BlockPos struct {
 }
 
 type View struct {
-	width, height        int
-	Loader               *world.Loader
-	projection, camera   mgl32.Mat4
-	program              uint32
-	projectionUniform    int32
-	cameraUniform        int32
-	modelUniform         int32
-	textureUniform       int32
-	textureOffsetUniform int32
-	alphaMinUniform      int32
-	daylightUniform      int32
-	viewScrollUniform    int32
-	modelScrollUniform   int32
-	timeUniform          int32
-	heightUniform        int32
-	uniqueOffsetUniform  int32
-	swayEnabledUniform   int32
-	vertAttrib           uint32
-	texCoordAttrib       uint32
-	textures             map[int]*Texture
-	blocks               []*Block
-	vao                  uint32
-	blockPos             [SIZE][SIZE][world.SECTION_Z_SIZE]*BlockPos
-	edges                [SIZE][SIZE]*BlockPos
-	origins              [SIZE][SIZE][world.SECTION_Z_SIZE]*BlockPos
-	zoom                 float64
-	shear                [3]float32
-	Cursor               *BlockPos
-	ScrollOffset         [3]float32
-	maxZ                 int
-	underShape           *shapes.Shape
-	daylight             [4]float32
+	width, height         int
+	Loader                *world.Loader
+	projection, camera    mgl32.Mat4
+	program               uint32
+	projectionUniform     int32
+	cameraUniform         int32
+	modelUniform          int32
+	textureUniform        int32
+	textureOffsetUniform  int32
+	alphaMinUniform       int32
+	daylightUniform       int32
+	viewScrollUniform     int32
+	modelScrollUniform    int32
+	timeUniform           int32
+	heightUniform         int32
+	uniqueOffsetUniform   int32
+	swayEnabledUniform    int32
+	bobEnabledUniform     int32
+	breatheEnabledUniform int32
+	vertAttrib            uint32
+	texCoordAttrib        uint32
+	textures              map[int]*Texture
+	blocks                []*Block
+	vao                   uint32
+	blockPos              [SIZE][SIZE][world.SECTION_Z_SIZE]*BlockPos
+	edges                 [SIZE][SIZE]*BlockPos
+	origins               [SIZE][SIZE][world.SECTION_Z_SIZE]*BlockPos
+	zoom                  float64
+	shear                 [3]float32
+	Cursor                *BlockPos
+	ScrollOffset          [3]float32
+	maxZ                  int
+	underShape            *shapes.Shape
+	daylight              [4]float32
 }
 
 const viewSize = 10
@@ -128,6 +130,8 @@ func InitView(zoom float64, camera, shear [3]float32, loader *world.Loader) *Vie
 	view.heightUniform = gl.GetUniformLocation(view.program, gl.Str("height\x00"))
 	view.uniqueOffsetUniform = gl.GetUniformLocation(view.program, gl.Str("uniqueOffset\x00"))
 	view.swayEnabledUniform = gl.GetUniformLocation(view.program, gl.Str("swayEnabled\x00"))
+	view.bobEnabledUniform = gl.GetUniformLocation(view.program, gl.Str("bobEnabled\x00"))
+	view.breatheEnabledUniform = gl.GetUniformLocation(view.program, gl.Str("breatheEnabled\x00"))
 	view.textureUniform = gl.GetUniformLocation(view.program, gl.Str("tex\x00"))
 	view.textureOffsetUniform = gl.GetUniformLocation(view.program, gl.Str("textureOffset\x00"))
 	view.alphaMinUniform = gl.GetUniformLocation(view.program, gl.Str("alphaMin\x00"))
@@ -688,6 +692,16 @@ func (b *BlockPos) Draw(view *View, extraIndex int) {
 	} else {
 		gl.Uniform1i(view.swayEnabledUniform, 0)
 	}
+	if block.shape.BobEnabled {
+		gl.Uniform1i(view.bobEnabledUniform, 1)
+	} else {
+		gl.Uniform1i(view.bobEnabledUniform, 0)
+	}
+	if block.shape.BreatheEnabled {
+		gl.Uniform1i(view.breatheEnabledUniform, 1)
+	} else {
+		gl.Uniform1i(view.breatheEnabledUniform, 0)
+	}
 
 	animated := false
 	if b.dir != shapes.DIR_NONE {
@@ -743,6 +757,8 @@ uniform vec2 modelScroll;
 uniform float time;
 uniform float height;
 uniform int swayEnabled;
+uniform int bobEnabled;
+uniform int breatheEnabled;
 uniform int uniqueOffset;
 in vec3 vert;
 in vec2 vertTexCoord;
@@ -757,10 +773,17 @@ void main() {
 	float swayY = 0;
 	if(swayEnabled == 1) {
 		swayY = (vert.z / height) * cos(time + uniqueOffset) / 10.0;
+	}
+	float bobZ = 0;
+	if(bobEnabled == 1) {
+		bobZ = cos((time + uniqueOffset) * 5.0) / 10.0;
+	}	
+	if(breatheEnabled == 1) {
+		bobZ = (vert.z / height) * cos((time + uniqueOffset) * 2.5) / 20.0;
 	}	
 	float offsX = modelScroll.x - viewScroll.x + swayX;
 	float offsY = modelScroll.y - viewScroll.y + swayY;
-	float offsZ = -viewScroll.z;
+	float offsZ = bobZ - viewScroll.z;
 
 	// matrix constructor is in column first order
 	mat4 modelScroll = mat4(
