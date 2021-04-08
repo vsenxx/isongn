@@ -51,3 +51,26 @@ func GetDir(dx, dy int) Direction {
 	}
 	return DIR_NONE
 }
+
+func (dir Direction) GetDelta() (int, int) {
+	switch dir {
+	case DIR_W:
+		return 1, 0
+	case DIR_E:
+		return -1, 0
+	case DIR_S:
+		return 0, 1
+	case DIR_N:
+		return 0, -1
+	case DIR_SW:
+		return 1, 1
+	case DIR_NE:
+		return -1, -1
+	case DIR_SE:
+		return -1, 1
+	case DIR_NW:
+		return 1, -1
+	default:
+		return 0, 0
+	}
+}

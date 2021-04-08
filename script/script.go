@@ -193,6 +193,15 @@ func getDir(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	return float64(shapes.GetDir(int(dx), int(dy))), nil
 }
 
+func getDelta(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+	dir := shapes.Direction(int(arg[0].(float64)))
+	dx, dy := dir.GetDelta()
+	r := make([]interface{}, 2)
+	r[0] = float64(dx)
+	r[1] = float64(dy)
+	return &r, nil
+}
+
 func getShape(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	x := int(arg[0].(float64))
 	y := int(arg[1].(float64))
@@ -438,6 +447,7 @@ func InitScript() {
 	bscript.AddBuiltin("setViewScroll", setViewScroll)
 	bscript.AddBuiltin("print", print)
 	bscript.AddBuiltin("getDir", getDir)
+	bscript.AddBuiltin("getDelta", getDelta)
 	bscript.AddBuiltin("isInView", isInView)
 	bscript.AddBuiltin("saveGame", saveGame)
 	bscript.AddBuiltin("loadGame", loadGame)

@@ -165,7 +165,7 @@ func (e *Editor) Events(delta float64, fadeDir int) {
 			return false
 		})
 	}
-	if e.app.IsFirstDown(glfw.KeyF) {
+	if e.app.IsFirstDown(glfw.KeyT) {
 		shapes.Shapes[e.shapeSelectorIndex].Traverse(func(xx, yy, zz int) bool {
 			e.app.Loader.EraseAllExtras(e.app.Loader.X+xx, e.app.Loader.Y+yy, e.Z+zz)
 			return false
@@ -224,6 +224,7 @@ func (e *Editor) fill() {
 		if found {
 			replaceShape = shapes.Shapes[shapeIndex]
 		}
+		fmt.Printf("replaceShape=%v\n", replaceShape)
 		e.fillAt(e.app.Loader.X, e.app.Loader.Y, shape, replaceShape, map[string]bool{})
 	}
 }
@@ -238,6 +239,7 @@ func (e *Editor) fillAt(x, y int, shape, replaceShape *shapes.Shape, seen map[st
 	}
 	seen[key] = true
 	shapeIndex, _, _, _, found := e.app.View.GetShape(x, y, 0)
+	fmt.Printf("\tpos=%d,%d found=%v\n", x, y, found)
 	if (replaceShape == nil && found == false) || (replaceShape != nil && int(shapeIndex) == replaceShape.Index) {
 		e.setShape(x, y, 0, shape, false)
 		w := int(shape.Size[0])
