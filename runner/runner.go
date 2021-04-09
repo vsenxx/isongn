@@ -195,6 +195,11 @@ func (runner *Runner) DelMessage(messageIndex int) {
 	runner.updateOverlay = true
 }
 
+func (runner *Runner) DelAllMessages() {
+	runner.messages = map[int]*Message{}
+	runner.updateOverlay = true
+}
+
 // todo: PositionMessage-s should be vbo-s instead of using the cpu to recalc their positions
 const MESSAGE_TTL = 2
 

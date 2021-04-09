@@ -269,6 +269,12 @@ func delMessage(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	return nil, nil
 }
 
+func delAllMessages(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+	runner := ctx.App["runner"].(*runner.Runner)
+	runner.DelAllMessages()
+	return nil, nil
+}
+
 func messageWidth(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	message := arg[0].(string)
 	app := ctx.App["app"].(*gfx.App)
@@ -454,6 +460,7 @@ func InitScript() {
 	bscript.AddBuiltin("showMessageAt", showMessageAt)
 	bscript.AddBuiltin("addMessage", addMessage)
 	bscript.AddBuiltin("delMessage", delMessage)
+	bscript.AddBuiltin("delAllMessages", delAllMessages)
 	bscript.AddBuiltin("messageWidth", messageWidth)
 	bscript.AddBuiltin("getDateTime", getDateTime)
 	bscript.AddBuiltin("getTime", getTime)

@@ -42,6 +42,7 @@ func (e *Editor) Init(app *gfx.App, config map[string]interface{}) {
 		e.app.FadeDone()
 	})
 	e.app.Loader.SetIoMode(world.EDITOR_MODE)
+	e.app.Loader.MoveTo(4200, 4174)
 	e.app.View.Load()
 
 	// compile the editor script code
@@ -165,7 +166,7 @@ func (e *Editor) Events(delta float64, fadeDir int) {
 			return false
 		})
 	}
-	if e.app.IsFirstDown(glfw.KeyT) {
+	if e.app.IsFirstDownMod(glfw.KeyE, glfw.ModShift) {
 		shapes.Shapes[e.shapeSelectorIndex].Traverse(func(xx, yy, zz int) bool {
 			e.app.Loader.EraseAllExtras(e.app.Loader.X+xx, e.app.Loader.Y+yy, e.Z+zz)
 			return false

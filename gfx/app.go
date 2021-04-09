@@ -268,6 +268,15 @@ func (app *App) IsFirstDown(key glfw.Key) bool {
 	return false
 }
 
+func (app *App) IsFirstDownMod(key glfw.Key, mod glfw.ModifierKey) bool {
+	event, ok := app.KeyState[key]
+	if ok && event.First && event.Mods&mod > 0 {
+		event.First = false
+		return true
+	}
+	return false
+}
+
 func (app *App) Keypressed(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
 	if action == glfw.Release {
 		delete(app.KeyState, key)
