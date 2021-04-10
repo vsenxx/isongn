@@ -171,6 +171,7 @@ func (ui *Ui) Draw() {
 	gl.Disable(gl.DEPTH_TEST)
 	gl.ClearColor(0, 0, 0, 0)
 	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+	gl.Disable(gl.BLEND)
 	gl.BindVertexArray(ui.vao)
 	gl.EnableVertexAttribArray(ui.vertAttrib)
 	gl.EnableVertexAttribArray(ui.texCoordAttrib)

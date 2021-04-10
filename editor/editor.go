@@ -27,12 +27,15 @@ type Editor struct {
 	editorCall          *bscript.Variable
 	lastX, lastY        int
 	updateCursor        bool
+	startX, startY      int
 }
 
-func NewEditor() *Editor {
+func NewEditor(x, y int) *Editor {
 	return &Editor{
 		shapeSelectorUpdate: true,
 		infoUpdate:          true,
+		startX:              x,
+		startY:              y,
 	}
 }
 
@@ -42,7 +45,8 @@ func (e *Editor) Init(app *gfx.App, config map[string]interface{}) {
 		e.app.FadeDone()
 	})
 	e.app.Loader.SetIoMode(world.EDITOR_MODE)
-	e.app.Loader.MoveTo(4200, 4174)
+	// e.app.Loader.MoveTo(4200, 4174)
+	e.app.Loader.MoveTo(e.startX, e.startY)
 	e.app.View.Load()
 
 	// compile the editor script code
@@ -157,7 +161,13 @@ func (e *Editor) Events(delta float64, fadeDir int) {
 		e.setShape(e.app.Loader.X, e.app.Loader.Y, e.Z, shapes.Shapes[e.shapeSelectorIndex], ff)
 		changed = true
 	}
-	if e.app.IsFirstDown(glfw.KeyE) && e.Z > 0 {
+	if e.app.IsFirstDownMod(glfw.KeyE, glfw.ModShift) {
+		shapes.Shapes[e.shapeSelectorIndex].Traverse(func(xx, yy, zz int) bool {
+			e.app.Loader.EraseAllExtras(e.app.Loader.X+xx, e.app.Loader.Y+yy, e.Z+zz)
+			return false
+		})
+		changed = true
+	} else if e.app.IsFirstDown(glfw.KeyE) && e.Z > 0 {
 		shapes.Shapes[e.shapeSelectorIndex].Traverse(func(xx, yy, zz int) bool {
 			if zz == 0 {
 				e.app.View.EraseShape(e.app.Loader.X+xx, e.app.Loader.Y+yy, e.Z-1)
@@ -165,13 +175,6 @@ func (e *Editor) Events(delta float64, fadeDir int) {
 			}
 			return false
 		})
-	}
-	if e.app.IsFirstDownMod(glfw.KeyE, glfw.ModShift) {
-		shapes.Shapes[e.shapeSelectorIndex].Traverse(func(xx, yy, zz int) bool {
-			e.app.Loader.EraseAllExtras(e.app.Loader.X+xx, e.app.Loader.Y+yy, e.Z+zz)
-			return false
-		})
-		changed = true
 	}
 	if e.app.IsFirstDown(glfw.KeyU) {
 		seen := map[string]bool{}

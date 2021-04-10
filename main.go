@@ -29,6 +29,8 @@ func main() {
 	mode := flag.String("mode", "runner", "Game or Editor mode")
 	winWidth := flag.Int("width", 800, "Window width (default: 800)")
 	winHeight := flag.Int("height", 600, "Window height (default: 600)")
+	x := flag.Int("x", 5000, "Editor start X")
+	y := flag.Int("y", 5015, "Editor start Y")
 	fps := flag.Float64("fps", 60, "Frames per second")
 	flag.Parse()
 
@@ -37,7 +39,7 @@ func main() {
 	}
 	defer glfw.Terminate()
 
-	editor := editor.NewEditor()
+	editor := editor.NewEditor(*x, *y)
 	runner := runner.NewRunner()
 	var game gfx.Game
 	if *mode == editor.Name() {

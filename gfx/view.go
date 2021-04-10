@@ -459,6 +459,22 @@ func (view *View) Fits(toWorldX, toWorldY, toWorldZ int, fromWorldX, fromWorldY,
 	return fits
 }
 
+func (view *View) IsEmpty(toWorldX, toWorldY, toWorldZ int, shape *shapes.Shape) bool {
+	fits := true
+	shape.Traverse(func(x, y, z int) bool {
+		viewX, viewY, viewZ, validPos := view.toViewPos(toWorldX+x, toWorldY+y, toWorldZ+z)
+		if validPos {
+			b := view.origins[viewX][viewY][viewZ]
+			if b != nil && b.block != nil {
+				fits = false
+				return true
+			}
+		}
+		return false
+	})
+	return fits
+}
+
 func (view *View) FindTop(worldX, worldY int, shape *shapes.Shape) int {
 	maxZ := 0
 	for x := 0; x < int(shape.Size[0]); x++ {
@@ -627,6 +643,8 @@ func (view *View) Draw(delta float64) {
 	gl.Enable(gl.DEPTH_TEST)
 	gl.ClearColor(0, 0, 0, 1)
 	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+	gl.BlendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+	gl.Enable(gl.BLEND)
 	gl.ActiveTexture(gl.TEXTURE0)
 	gl.UseProgram(view.program)
 	gl.BindVertexArray(view.vao)

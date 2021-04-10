@@ -164,6 +164,15 @@ func fits(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	return app.View.Fits(tx, ty, tz, fx, fy, fz), nil
 }
 
+func isEmpty(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+	tx := int(arg[0].(float64))
+	ty := int(arg[1].(float64))
+	tz := int(arg[2].(float64))
+	shape := arg[3].(string)
+	app := ctx.App["app"].(*gfx.App)
+	return app.View.IsEmpty(tx, ty, tz, shapes.Shapes[shapes.Names[shape]]), nil
+}
+
 func moveViewTo(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	x := int(arg[0].(float64))
 	y := int(arg[1].(float64))
@@ -448,6 +457,7 @@ func InitScript() {
 	bscript.AddBuiltin("setAnimation", setAnimation)
 	bscript.AddBuiltin("setOffset", setOffset)
 	bscript.AddBuiltin("fits", fits)
+	bscript.AddBuiltin("isEmpty", isEmpty)
 	bscript.AddBuiltin("moveViewTo", moveViewTo)
 	bscript.AddBuiltin("fadeViewTo", fadeViewTo)
 	bscript.AddBuiltin("setViewScroll", setViewScroll)
