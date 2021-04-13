@@ -109,6 +109,38 @@ func setShape(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	return nil, nil
 }
 
+func setShapeExtra(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+	x := int(arg[0].(float64))
+	y := int(arg[1].(float64))
+	z := int(arg[2].(float64))
+	name := arg[3].(string)
+	app := ctx.App["app"].(*gfx.App)
+	app.Loader.AddExtra(x, y, z, shapes.Names[name])
+	return nil, nil
+}
+
+func eraseAllExtras(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+	x := int(arg[0].(float64))
+	y := int(arg[1].(float64))
+	z := int(arg[2].(float64))
+	app := ctx.App["app"].(*gfx.App)
+	app.Loader.EraseAllExtras(x, y, z)
+	return nil, nil
+}
+
+func getShapeExtra(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+	x := int(arg[0].(float64))
+	y := int(arg[1].(float64))
+	z := int(arg[2].(float64))
+	app := ctx.App["app"].(*gfx.App)
+	extras := app.Loader.GetExtras(x, y, z)
+	r := make([]interface{}, len(extras))
+	for i, e := range extras {
+		r[i] = shapes.Shapes[e].Name
+	}
+	return &r, nil
+}
+
 func moveShape(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	x := int(arg[0].(float64))
 	y := int(arg[1].(float64))
@@ -454,6 +486,9 @@ func InitScript() {
 	bscript.AddBuiltin("setShape", setShape)
 	bscript.AddBuiltin("moveShape", moveShape)
 	bscript.AddBuiltin("getShape", getShape)
+	bscript.AddBuiltin("setShapeExtra", setShapeExtra)
+	bscript.AddBuiltin("getShapeExtra", getShapeExtra)
+	bscript.AddBuiltin("eraseAllExtras", eraseAllExtras)
 	bscript.AddBuiltin("setAnimation", setAnimation)
 	bscript.AddBuiltin("setOffset", setOffset)
 	bscript.AddBuiltin("fits", fits)

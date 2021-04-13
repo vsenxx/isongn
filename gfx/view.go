@@ -661,13 +661,18 @@ func (view *View) Draw(delta float64) {
 		if blockPos.block != nil && z < view.maxZ && underShape {
 			blockPos.Draw(view, -1)
 		}
-		for i := 0; i < EXTRA_SIZE; i++ {
-			if blockPos.extras[i] == nil {
-				break
+		if z < view.maxZ && underShape {
+			modelZ := blockPos.model.At(2, 3)
+			for i := 0; i < EXTRA_SIZE; i++ {
+				if blockPos.extras[i] == nil {
+					break
+				}
+				// show extras slightly on top of each other
+				blockPos.model.Set(2, 3, modelZ+float32(i)*0.1)
+				blockPos.Draw(view, i)
 			}
-			blockPos.Draw(view, i)
+			blockPos.model.Set(2, 3, modelZ)
 		}
-
 		if z == 0 && underShape {
 			edge := view.edges[x][y]
 			if edge.block != nil {

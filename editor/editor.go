@@ -51,7 +51,7 @@ func (e *Editor) Init(app *gfx.App, config map[string]interface{}) {
 
 	// compile the editor script code
 	ast, ctx, err := bscript.Build(
-		filepath.Join(e.app.Config.GameDir, "src", "editor.b"),
+		filepath.Join(e.app.Config.GameDir, "src", "editor"),
 		false,
 		map[string]interface{}{
 			"app":    app,

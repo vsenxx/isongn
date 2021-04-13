@@ -3,6 +3,7 @@ package shapes
 import (
 	"fmt"
 	"image"
+	"math"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -111,7 +112,7 @@ func InitShapes(gameDir string, data []map[string]interface{}) error {
 func appendShape(index int, name string, shapeDef map[string]interface{}, imageIndex int, img image.Image, shapeMeta *ShapeMeta) {
 	// size
 	sizeI := shapeDef["size"].([]interface{})
-	size := [3]float32{float32(sizeI[0].(float64)), float32(sizeI[1].(float64)), float32(sizeI[2].(float64))}
+	size := [3]float32{float32(sizeI[0].(float64)), float32(sizeI[1].(float64)), float32(math.Max(sizeI[2].(float64), 0.1))}
 
 	// pixel bounding box
 	posI := shapeDef["pos"].([]interface{})
