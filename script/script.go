@@ -354,6 +354,28 @@ func distance(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	return math.Sqrt(dx + dy + dz), nil
 }
 
+func findPath(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+	sx := int(arg[0].(float64))
+	sy := int(arg[1].(float64))
+	sz := int(arg[2].(float64))
+	ex := int(arg[3].(float64))
+	ey := int(arg[4].(float64))
+	ez := int(arg[5].(float64))
+	app := ctx.App["app"].(*gfx.App)
+	path := app.View.FindPath(sx, sy, sz, ex, ey, ez)
+	if path == nil {
+		return nil, nil
+	} else {
+		r := make([]interface{}, len(path)*3)
+		for i, node := range path {
+			r[i*3] = float64(node[0])
+			r[i*3+1] = float64(node[1])
+			r[i*3+2] = float64(node[2])
+		}
+		return &r, nil
+	}
+}
+
 var constants map[string]interface{} = map[string]interface{}{
 	// directions
 	"DirW":    float64(shapes.DIR_W),
@@ -526,6 +548,7 @@ func InitScript() {
 	bscript.AddBuiltin("getCalendar", getCalendar)
 	bscript.AddBuiltin("getScreenPos", getScreenPos)
 	bscript.AddBuiltin("distance", distance)
+	bscript.AddBuiltin("findPath", findPath)
 	for k, v := range constants {
 		bscript.AddConstant(k, v)
 	}

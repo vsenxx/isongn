@@ -30,6 +30,14 @@ const EXTRA_SIZE = 8
 
 var ZERO_OFFSET [2]float32
 
+type PathNode struct {
+	f, g, h            int
+	visited, closed    bool
+	blocked, fitCalled bool
+	debug              string
+	parent             *BlockPos
+}
+
 // BlockPos is a displayed Shape at a location
 type BlockPos struct {
 	model                  mgl32.Mat4
@@ -42,6 +50,7 @@ type BlockPos struct {
 	animationType          int
 	animationSpeed         float64
 	ScrollOffset           [2]float32
+	pathNode               PathNode
 }
 
 type View struct {
@@ -767,6 +776,169 @@ func (view *View) SetDaylight(r, g, b, a float32) {
 	view.daylight[1] = g / 255
 	view.daylight[2] = b / 255
 	view.daylight[3] = 1
+}
+
+type PathStep [3]int
+
+func (view *View) FindPath(sx, sy, sz, ex, ey, ez int) []PathStep {
+	startViewX, startViewY, startViewZ, startOk := view.toViewPos(sx, sy, sz)
+	endViewX, endViewY, endViewZ, endOk := view.toViewPos(ex, ey, ez)
+	if startOk && endOk {
+		return view.findPath(startViewX, startViewY, startViewZ, endViewX, endViewY, endViewZ, sx, sy, sz)
+	}
+	return nil
+}
+
+/**
+	AStar search
+
+	Implemented from: astar-list.js http://github.com/bgrins/javascript-astar
+    MIT License
+
+    ** You should not use this implementation (it is quite slower than the heap implementation) **
+
+    Implements the astar search algorithm in javascript
+    Based off the original blog post http://www.briangrinstead.com/blog/astar-search-algorithm-in-javascript
+    It has since been replaced with astar.js which uses a Binary Heap and is quite faster, but I am leaving
+    it here since it is more strictly following pseudocode for the Astar search
+*/
+func (view *View) findPath(startViewX, startViewY, startViewZ, endViewX, endViewY, endViewZ, startWorldX, startWorldY, startWorldZ int) []PathStep {
+	view.resetPathFind()
+	end := view.blockPos[endViewX][endViewY][endViewZ]
+	openList := []*BlockPos{view.blockPos[startViewX][startViewY][startViewZ]}
+	for len(openList) > 0 {
+		// Grab the lowest f(x) to process next
+		lowInd := 0
+		for i := range openList {
+			if openList[i].pathNode.f < openList[lowInd].pathNode.f {
+				lowInd = i
+			}
+		}
+
+		currentNode := openList[lowInd]
+
+		// End case -- result has been found, return the traced path
+		if currentNode.x == end.x && currentNode.y == end.y && currentNode.z == end.z {
+			ret := []PathStep{}
+			for currentNode.pathNode.parent != nil {
+				wx, wy, wz := view.toWorldPos(currentNode.x, currentNode.y, currentNode.z)
+				ret = append(ret, PathStep{wx, wy, wz})
+				currentNode = currentNode.pathNode.parent
+			}
+			return reverse(ret)
+		}
+
+		// Normal case -- move currentNode from open to closed, process each of its neighbors
+		remove(openList, lowInd)
+		currentNode.pathNode.closed = true
+
+		neighbors := view.astarNeighbors(currentNode)
+		for _, neighbor := range neighbors {
+			// process only valid nodes
+			if !neighbor.pathNode.closed && view.isBlocked(neighbor, startWorldX, startWorldY, startWorldZ) {
+				// g score is the shortest distance from start to current node, we need to check if
+				//   the path we have arrived at this neighbor is the shortest one we have seen yet
+				// adding 1: 1 is the distance from a node to it's neighbor
+				gScore := currentNode.pathNode.g + 1
+				gScoreIsBest := false
+
+				if !neighbor.pathNode.visited {
+					// This the the first time we have arrived at this node, it must be the best
+					// Also, we need to take the h (heuristic) score since we haven't done so yet
+					gScoreIsBest = true
+					neighbor.pathNode.h = heuristic(neighbor, end)
+					neighbor.pathNode.visited = true
+					openList = append(openList, neighbor)
+				} else if gScore < neighbor.pathNode.g {
+					// We have already seen the node, but last time it had a worse g (distance from start)
+					gScoreIsBest = true
+				}
+
+				if gScoreIsBest {
+					// Found an optimal (so far) path to this node.  Store info on how we got here and
+					//  just how good it really is...
+					neighbor.pathNode.parent = currentNode
+					neighbor.pathNode.g = gScore
+					neighbor.pathNode.f = neighbor.pathNode.g + neighbor.pathNode.h
+				}
+			}
+		}
+	}
+
+	// No result was found -- nil signifies failure to find path
+	return nil
+}
+
+func heuristic(pos0, pos1 *BlockPos) int {
+	// Manhattan distance. See list of heuristics: http://theory.stanford.edu/~amitp/GameProgramming/Heuristics.html
+	d1 := int(math.Abs(float64(pos1.x - pos0.x)))
+	d2 := int(math.Abs(float64(pos1.y - pos0.y)))
+	d3 := int(math.Abs(float64(pos1.z - pos0.z)))
+	return d1 + d2 + d3
+}
+
+func (view *View) isBlocked(node *BlockPos, startWorldX, startWorldY, startWorldZ int) bool {
+	if !node.pathNode.fitCalled {
+		node.pathNode.fitCalled = true
+		wx, wy, wz := view.toWorldPos(node.x, node.y, node.z)
+		node.pathNode.blocked = view.Fits(wx, wy, wz, startWorldX, startWorldY, startWorldZ)
+	}
+	return node.pathNode.blocked
+}
+
+func (view *View) astarNeighbors(node *BlockPos) []*BlockPos {
+	ret := []*BlockPos{}
+	if node.x-1 >= 0 {
+		ret = append(ret, view.blockPos[node.x-1][node.y][node.z])
+	}
+	if node.x+1 < SIZE {
+		ret = append(ret, view.blockPos[node.x+1][node.y][node.z])
+	}
+	if node.y-1 >= 0 {
+		ret = append(ret, view.blockPos[node.x][node.y-1][node.z])
+	}
+	if node.y+1 < SIZE {
+		ret = append(ret, view.blockPos[node.x][node.y+1][node.z])
+	}
+	if node.z-1 >= 0 {
+		ret = append(ret, view.blockPos[node.x][node.y][node.z-1])
+	}
+	if node.z+1 < world.SECTION_Z_SIZE {
+		ret = append(ret, view.blockPos[node.x][node.y][node.z+1])
+	}
+	return ret
+}
+
+func remove(s []*BlockPos, i int) []*BlockPos {
+	s[i] = s[len(s)-1]
+	// We do not need to put s[i] at the end, as it will be discarded anyway
+	return s[:len(s)-1]
+}
+
+func reverse(nodes []PathStep) []PathStep {
+	for i := 0; i < len(nodes)/2; i++ {
+		j := len(nodes) - i - 1
+		nodes[i], nodes[j] = nodes[j], nodes[i]
+	}
+	return nodes
+}
+
+func (view *View) resetPathFind() {
+	for x := range view.blockPos {
+		for y := range view.blockPos[x] {
+			for _, blockPos := range view.blockPos[x][y] {
+				blockPos.pathNode.f = 0
+				blockPos.pathNode.g = 0
+				blockPos.pathNode.h = 0
+				blockPos.pathNode.blocked = false
+				blockPos.pathNode.fitCalled = false
+				blockPos.pathNode.visited = false
+				blockPos.pathNode.closed = false
+				blockPos.pathNode.parent = nil
+				blockPos.pathNode.debug = ""
+			}
+		}
+	}
 }
 
 var vertexShader = `
