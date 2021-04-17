@@ -668,7 +668,7 @@ func (view *View) Draw(delta float64) {
 					break
 				}
 				// show extras slightly on top of each other
-				blockPos.model.Set(2, 3, modelZ+float32(i)*0.1)
+				blockPos.model.Set(2, 3, modelZ+float32(i)*0.01)
 				blockPos.Draw(view, i)
 			}
 			blockPos.model.Set(2, 3, modelZ)

@@ -34,6 +34,8 @@ type Runner struct {
 	deltaArg           *bscript.Value
 	fadeDirArg         *bscript.Value
 	sectionLoadCall    *bscript.Variable
+	hourArg            *bscript.Value
+	hourCall           *bscript.Variable
 	sectionLoadXArg    *bscript.Value
 	sectionLoadYArg    *bscript.Value
 	sectionLoadDataArg *bscript.Value
@@ -46,6 +48,7 @@ type Runner struct {
 	Calendar           *Calendar
 	positionMessages   []*PositionMessage
 	daylight           [24][3]float32
+	lastHour           int
 }
 
 func NewRunner() *Runner {
@@ -115,6 +118,9 @@ func (runner *Runner) Init(app *gfx.App, config map[string]interface{}) {
 	runner.deltaArg = &bscript.Value{Number: &bscript.SignedNumber{}}
 	runner.fadeDirArg = &bscript.Value{Number: &bscript.SignedNumber{}}
 	runner.eventsCall = util.NewFunctionCall("events", runner.deltaArg, runner.fadeDirArg)
+
+	runner.hourArg = &bscript.Value{Number: &bscript.SignedNumber{}}
+	runner.hourCall = util.NewFunctionCall("onHour", runner.hourArg)
 
 	runner.sectionLoadXArg = &bscript.Value{Number: &bscript.SignedNumber{}}
 	runner.sectionLoadYArg = &bscript.Value{Number: &bscript.SignedNumber{}}
@@ -253,4 +259,10 @@ func (runner *Runner) MinsChange(mins, hours, day, month, year int) {
 		util.Linear(nowColor[2], nextColor[2], percent),
 		255,
 	)
+	time := mins + hours*60
+	if time-runner.lastHour > 60 {
+		runner.lastHour = time
+		runner.hourArg.Number.Number = float64(hours)
+		runner.hourCall.Evaluate(runner.ctx)
+	}
 }

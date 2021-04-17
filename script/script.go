@@ -2,6 +2,7 @@ package script
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
 	"github.com/uzudil/bscript/bscript"
@@ -340,6 +341,19 @@ func isDown(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	return app.IsDown(key), nil
 }
 
+func distance(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
+	a := arg[0].(float64)
+	b := arg[1].(float64)
+	c := arg[2].(float64)
+	x := arg[3].(float64)
+	y := arg[4].(float64)
+	z := arg[5].(float64)
+	dx := (a - x) * (a - x)
+	dy := (b - y) * (b - y)
+	dz := (c - z) * (c - z)
+	return math.Sqrt(dx + dy + dz), nil
+}
+
 var constants map[string]interface{} = map[string]interface{}{
 	// directions
 	"DirW":    float64(shapes.DIR_W),
@@ -511,6 +525,7 @@ func InitScript() {
 	bscript.AddBuiltin("getTime", getTime)
 	bscript.AddBuiltin("getCalendar", getCalendar)
 	bscript.AddBuiltin("getScreenPos", getScreenPos)
+	bscript.AddBuiltin("distance", distance)
 	for k, v := range constants {
 		bscript.AddConstant(k, v)
 	}
