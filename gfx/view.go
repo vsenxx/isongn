@@ -80,7 +80,6 @@ type View struct {
 	vao                   uint32
 	blockPos              [SIZE][SIZE][world.SECTION_Z_SIZE]*BlockPos
 	edges                 [SIZE][SIZE]*BlockPos
-	origins               [SIZE][SIZE][world.SECTION_Z_SIZE]*BlockPos
 	zoom                  float64
 	shear                 [3]float32
 	Cursor                *BlockPos
@@ -345,30 +344,26 @@ func (view *View) SetUnderShape(shape *shapes.Shape) {
 }
 
 func (view *View) Load() {
-	// reset
-	view.traverse(func(x, y, z int) {
-		blockPos := view.blockPos[x][y][z]
-		blockPos.block = nil
-		blockPos.ScrollOffset[0] = 0
-		blockPos.ScrollOffset[1] = 0
-		view.origins[x][y][z] = nil
-		for i := 0; i < EXTRA_SIZE; i++ {
-			blockPos.extras[i] = nil
-		}
-
-		if z == 0 {
-			edge := view.edges[x][y]
-			edge.block = nil
-		}
-	})
-
 	// load
 	view.traverse(func(x, y, z int) {
 		worldX, worldY, worldZ := view.toWorldPos(x, y, z)
 		blockPos := view.blockPos[x][y][z]
+
+		// reset
+		blockPos.block = nil
+		blockPos.ScrollOffset[0] = 0
+		blockPos.ScrollOffset[1] = 0
+		for i := 0; i < EXTRA_SIZE; i++ {
+			blockPos.extras[i] = nil
+		}
+		if z == 0 {
+			edge := view.edges[x][y]
+			edge.block = nil
+		}
 		blockPos.worldX = worldX
 		blockPos.worldY = worldY
 		blockPos.worldZ = worldZ
+
 		shapeIndex, hasShape := view.Loader.GetShape(worldX, worldY, worldZ)
 		if hasShape {
 			view.setShapeInner(worldX, worldY, worldZ, shapeIndex, true)
@@ -428,15 +423,36 @@ func (view *View) InView(worldX, worldY, worldZ int) bool {
 	return validPos
 }
 
+const SEARCH_SIZE = 8
+
+func (view *View) getShapeAt(viewX, viewY, viewZ int) *BlockPos {
+	for x := 0; x < SEARCH_SIZE; x++ {
+		for y := 0; y < SEARCH_SIZE; y++ {
+			for z := 0; z < SEARCH_SIZE; z++ {
+				vx := viewX - x
+				vy := viewY - y
+				vz := viewZ - z
+				if vx >= 0 && vx < SIZE && vy >= 0 && vy < SIZE && vz >= 0 && vz < world.SECTION_Z_SIZE {
+					bp := view.blockPos[vx][vy][vz]
+					if bp.block != nil {
+						if vx+int(bp.block.sizeX) > viewX && vy+int(bp.block.sizeY) > viewY && vz+int(bp.block.sizeZ) > viewZ {
+							return bp
+						}
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func (view *View) GetShape(worldX, worldY, worldZ int) (int, int, int, int, bool) {
 	viewX, viewY, viewZ, validPos := view.toViewPos(worldX, worldY, worldZ)
-	if !validPos || view.origins[viewX][viewY][viewZ] == nil {
+	if !validPos {
 		return 0, 0, 0, 0, false
 	}
-	b := view.origins[viewX][viewY][viewZ]
-	if b.block == nil {
-		wx, wy, wz := view.toWorldPos(viewX, viewY, viewZ)
-		fmt.Printf("Error: origin points to nil block at: %d,%d,%d\n", wx, wy, wz)
+	b := view.getShapeAt(viewX, viewY, viewZ)
+	if b == nil {
 		return 0, 0, 0, 0, false
 	}
 	originWorldX, originWorldY, originWorldZ := view.toWorldPos(b.x, b.y, b.z)
@@ -454,7 +470,7 @@ func (view *View) Fits(toWorldX, toWorldY, toWorldZ int, fromWorldX, fromWorldY,
 	shape.Traverse(func(x, y, z int) bool {
 		viewX, viewY, viewZ, validPos := view.toViewPos(toWorldX+x, toWorldY+y, toWorldZ+z)
 		if validPos {
-			b := view.origins[viewX][viewY][viewZ]
+			b := view.getShapeAt(viewX, viewY, viewZ)
 			if b != nil && b.block != nil {
 				wx, wy, wz := view.toWorldPos(b.x, b.y, b.z)
 				// a shape is uniquely identified by its world coords (not its shape index)
@@ -474,7 +490,7 @@ func (view *View) IsEmpty(toWorldX, toWorldY, toWorldZ int, shape *shapes.Shape)
 	shape.Traverse(func(x, y, z int) bool {
 		viewX, viewY, viewZ, validPos := view.toViewPos(toWorldX+x, toWorldY+y, toWorldZ+z)
 		if validPos {
-			b := view.origins[viewX][viewY][viewZ]
+			b := view.getShapeAt(viewX, viewY, viewZ)
 			if b != nil && b.block != nil {
 				fits = false
 				return true
@@ -537,17 +553,6 @@ func (view *View) setShapeInner(worldX, worldY, worldZ int, shapeIndex int, hasS
 		} else {
 			blockPos.block = nil
 		}
-
-		shape.Traverse(func(shapeX, shapeY, shapeZ int) bool {
-			if viewX+shapeX < SIZE && viewY+shapeY < SIZE && viewZ+shapeZ < world.SECTION_Z_SIZE {
-				if hasShape {
-					view.origins[viewX+shapeX][viewY+shapeY][viewZ+shapeZ] = blockPos
-				} else {
-					view.origins[viewX+shapeX][viewY+shapeY][viewZ+shapeZ] = nil
-				}
-			}
-			return false
-		})
 
 		return blockPos
 	}
@@ -837,13 +842,13 @@ func (view *View) findPath(startViewX, startViewY, startViewZ, endViewX, endView
 		openList = remove(openList, lowInd)
 		currentNode.pathNode.closed = true
 
-		fmt.Printf("Processing: %d,%d,%d. List len=%d\n", currentNode.x, currentNode.y, currentNode.z, len(openList))
+		// fmt.Printf("Processing: %d,%d,%d. List len=%d\n", currentNode.x, currentNode.y, currentNode.z, len(openList))
 
 		neighbors := view.astarNeighbors(currentNode, startWorldX, startWorldY, startWorldZ)
 		for _, neighbor := range neighbors {
 			// process only valid nodes
 			if !neighbor.pathNode.closed {
-				fmt.Printf("\ttrying %d,%d,%d\n", neighbor.x, neighbor.y, neighbor.z)
+				// fmt.Printf("\ttrying %d,%d,%d\n", neighbor.x, neighbor.y, neighbor.z)
 				// g score is the shortest distance from start to current node, we need to check if
 				//   the path we have arrived at this neighbor is the shortest one we have seen yet
 				// adding 1: 1 is the distance from a node to it's neighbor
