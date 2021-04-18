@@ -91,7 +91,8 @@ type View struct {
 }
 
 const viewSize = 10
-const SIZE = 64
+const SIZE = 128
+const DRAW_SIZE = 64
 const VIEW_BORDER = 8
 
 func getProjection(zoom float32, shear [3]float32) mgl32.Mat4 {
@@ -609,6 +610,16 @@ func (view *View) traverse(fx func(x, y, z int)) {
 	}
 }
 
+func (view *View) traverseForDraw(fx func(x, y, z int)) {
+	for x := -DRAW_SIZE / 2; x < DRAW_SIZE/2; x++ {
+		for y := -DRAW_SIZE / 2; y < DRAW_SIZE/2; y++ {
+			for z := 0; z < world.SECTION_Z_SIZE; z++ {
+				fx(x+SIZE/2, y+SIZE/2, z)
+			}
+		}
+	}
+}
+
 func (view *View) SetCursor(shapeIndex int, z int) {
 	view.Cursor.model.Set(2, 3, float32(z))
 	view.Cursor.block = nil
@@ -664,7 +675,7 @@ func (view *View) Draw(delta float64) {
 	state.delta = delta
 	state.time += delta
 	state.init = false
-	view.traverse(func(x, y, z int) {
+	view.traverseForDraw(func(x, y, z int) {
 		blockPos := view.blockPos[x][y][z]
 		underShape := view.isUnderShape(x, y, z)
 		if blockPos.block != nil && z < view.maxZ && underShape {
