@@ -259,7 +259,7 @@ func (runner *Runner) MinsChange(mins, hours, day, month, year int) {
 		util.Linear(nowColor[2], nextColor[2], percent),
 		255,
 	)
-	time := mins + hours*60
+	time := ToEpoch(mins, hours, day, month, year)
 	if time-runner.lastHour > 60 {
 		runner.lastHour = time
 		runner.hourArg.Number.Number = float64(hours)

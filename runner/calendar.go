@@ -13,7 +13,7 @@ type Calendar struct {
 }
 
 func NewCalendar(mins, hours, day, month, year int, incSpeed float64) *Calendar {
-	return &Calendar{toEpoch(mins, hours, day, month, year), incSpeed, 0, nil}
+	return &Calendar{ToEpoch(mins, hours, day, month, year), incSpeed, 0, nil}
 }
 
 func (c *Calendar) Incr(delta float64) {
@@ -53,6 +53,6 @@ func (c *Calendar) AsTimeString() string {
 	return fmt.Sprintf("%02d:%02d", hours, mins)
 }
 
-func toEpoch(mins, hours, day, month, year int) int {
+func ToEpoch(mins, hours, day, month, year int) int {
 	return year*ticksPerYear + month*ticksPerMonth + day*ticksPerDay + hours*ticksPerHour + mins
 }

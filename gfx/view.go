@@ -819,23 +819,20 @@ func (view *View) findPath(startViewX, startViewY, startViewZ, endViewX, endView
 
 		// End case -- result has been found, return the traced path
 		if currentNode.x == end.x && currentNode.y == end.y && currentNode.z == end.z {
-			ret := []PathStep{}
-			for currentNode.pathNode.parent != nil {
-				wx, wy, wz := view.toWorldPos(currentNode.x, currentNode.y, currentNode.z)
-				ret = append(ret, PathStep{wx, wy, wz})
-				currentNode = currentNode.pathNode.parent
-			}
-			return reverse(ret)
+			return view.generatePath(currentNode)
 		}
 
 		// Normal case -- move currentNode from open to closed, process each of its neighbors
-		remove(openList, lowInd)
+		openList = remove(openList, lowInd)
 		currentNode.pathNode.closed = true
 
-		neighbors := view.astarNeighbors(currentNode)
+		fmt.Printf("Processing: %d,%d,%d. List len=%d\n", currentNode.x, currentNode.y, currentNode.z, len(openList))
+
+		neighbors := view.astarNeighbors(currentNode, startWorldX, startWorldY, startWorldZ)
 		for _, neighbor := range neighbors {
 			// process only valid nodes
-			if !neighbor.pathNode.closed && view.isBlocked(neighbor, startWorldX, startWorldY, startWorldZ) {
+			if !neighbor.pathNode.closed {
+				fmt.Printf("\ttrying %d,%d,%d\n", neighbor.x, neighbor.y, neighbor.z)
 				// g score is the shortest distance from start to current node, we need to check if
 				//   the path we have arrived at this neighbor is the shortest one we have seen yet
 				// adding 1: 1 is the distance from a node to it's neighbor
@@ -877,7 +874,56 @@ func heuristic(pos0, pos1 *BlockPos) int {
 	return d1 + d2 + d3
 }
 
-func (view *View) isBlocked(node *BlockPos, startWorldX, startWorldY, startWorldZ int) bool {
+func (view *View) astarNeighbors(node *BlockPos, startWorldX, startWorldY, startWorldZ int) []*BlockPos {
+	ret := []*BlockPos{}
+	if node.x-1 >= 0 {
+		if newNode := view.tryInDir(node, -1, 0, startWorldX, startWorldY, startWorldZ); newNode != nil {
+			ret = append(ret, newNode)
+		}
+	}
+	if node.x+1 < SIZE {
+		if newNode := view.tryInDir(node, 1, 0, startWorldX, startWorldY, startWorldZ); newNode != nil {
+			ret = append(ret, newNode)
+		}
+	}
+	if node.y-1 >= 0 {
+		if newNode := view.tryInDir(node, 0, -1, startWorldX, startWorldY, startWorldZ); newNode != nil {
+			ret = append(ret, newNode)
+		}
+	}
+	if node.y+1 < SIZE {
+		if newNode := view.tryInDir(node, 0, 1, startWorldX, startWorldY, startWorldZ); newNode != nil {
+			ret = append(ret, newNode)
+		}
+	}
+	return ret
+}
+
+// todo: take into account water/lava + standing on solid ground
+// then make script code use this also
+func (view *View) tryInDir(node *BlockPos, dx, dy, startWorldX, startWorldY, startWorldZ int) *BlockPos {
+
+	// can we drop down here? (check this before the same-z move)
+	newNode := view.blockPos[node.x+dx][node.y+dy][node.z-1]
+	if view.isFitOk(newNode, startWorldX, startWorldY, startWorldZ) {
+		return newNode
+	}
+
+	// same z move
+	newNode = view.blockPos[node.x+dx][node.y+dy][node.z]
+	if view.isFitOk(newNode, startWorldX, startWorldY, startWorldZ) {
+		return newNode
+	}
+
+	// step up?
+	newNode = view.blockPos[node.x+dx][node.y+dy][node.z+1]
+	if view.isFitOk(newNode, startWorldX, startWorldY, startWorldZ) {
+		return newNode
+	}
+	return nil
+}
+
+func (view *View) isFitOk(node *BlockPos, startWorldX, startWorldY, startWorldZ int) bool {
 	if !node.pathNode.fitCalled {
 		node.pathNode.fitCalled = true
 		wx, wy, wz := view.toWorldPos(node.x, node.y, node.z)
@@ -886,27 +932,14 @@ func (view *View) isBlocked(node *BlockPos, startWorldX, startWorldY, startWorld
 	return node.pathNode.blocked
 }
 
-func (view *View) astarNeighbors(node *BlockPos) []*BlockPos {
-	ret := []*BlockPos{}
-	if node.x-1 >= 0 {
-		ret = append(ret, view.blockPos[node.x-1][node.y][node.z])
+func (view *View) generatePath(currentNode *BlockPos) []PathStep {
+	ret := []PathStep{}
+	for currentNode.pathNode.parent != nil {
+		wx, wy, wz := view.toWorldPos(currentNode.x, currentNode.y, currentNode.z)
+		ret = append(ret, PathStep{wx, wy, wz})
+		currentNode = currentNode.pathNode.parent
 	}
-	if node.x+1 < SIZE {
-		ret = append(ret, view.blockPos[node.x+1][node.y][node.z])
-	}
-	if node.y-1 >= 0 {
-		ret = append(ret, view.blockPos[node.x][node.y-1][node.z])
-	}
-	if node.y+1 < SIZE {
-		ret = append(ret, view.blockPos[node.x][node.y+1][node.z])
-	}
-	if node.z-1 >= 0 {
-		ret = append(ret, view.blockPos[node.x][node.y][node.z-1])
-	}
-	if node.z+1 < world.SECTION_Z_SIZE {
-		ret = append(ret, view.blockPos[node.x][node.y][node.z+1])
-	}
-	return ret
+	return reverse(ret)
 }
 
 func remove(s []*BlockPos, i int) []*BlockPos {
