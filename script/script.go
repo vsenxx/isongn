@@ -148,10 +148,8 @@ func moveShape(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	z := int(arg[2].(float64))
 	nx := int(arg[3].(float64))
 	ny := int(arg[4].(float64))
-	nz := int(arg[5].(float64))
 	app := ctx.App["app"].(*gfx.App)
-	app.View.MoveShape(x, y, z, nx, ny, nz)
-	return nil, nil
+	return float64(app.View.MoveShape(x, y, z, nx, ny)), nil
 }
 
 func setOffset(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {

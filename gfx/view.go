@@ -564,11 +564,26 @@ func (view *View) FindTop(worldX, worldY int, shape *shapes.Shape) int {
 	return maxZ
 }
 
-func (view *View) MoveShape(worldX, worldY, worldZ, newWorldX, newWorldY, newWorldZ int) {
-	blockPos, shapeIndex := view.EraseShape(worldX, worldY, worldZ)
-	if blockPos != nil {
-		view.SetShape(newWorldX, newWorldY, newWorldZ, shapeIndex)
+// Move a shape from (worldX, worldY, worldZ) to a new position of (newWorldX, newWorldY).
+// Returns the new Z value, or -1 if the shape won't fit.
+func (view *View) MoveShape(worldX, worldY, worldZ, newWorldX, newWorldY int) int {
+	newViewX, newViewY, _, validPos := view.toViewPos(newWorldX, newWorldY, 0)
+	if !validPos {
+		return -1
 	}
+
+	// figure out the new Z
+	bp := view.tryMove(newViewX, newViewY, worldX, worldY, worldZ, false)
+
+	// move
+	if bp != nil {
+		blockPos, shapeIndex := view.EraseShape(worldX, worldY, worldZ)
+		if blockPos != nil {
+			view.SetShape(newWorldX, newWorldY, bp.z, shapeIndex)
+		}
+		return bp.z
+	}
+	return -1
 }
 
 func (view *View) SetShape(worldX, worldY, worldZ int, shapeIndex int) *BlockPos {
@@ -964,37 +979,55 @@ func (view *View) astarNeighbors(node *BlockPos, startWorldX, startWorldY, start
 	return ret
 }
 
-// todo: take into account water/lava + standing on solid ground
-// then make script code use this also
 func (view *View) tryInDir(node *BlockPos, dx, dy, startWorldX, startWorldY, startWorldZ int) *BlockPos {
+	return view.tryMove(node.x+dx, node.y+dy, startWorldX, startWorldY, startWorldZ, true)
+}
+
+// todo: take into account water/lava
+func (view *View) tryMove(newViewX, newViewY, startWorldX, startWorldY, startWorldZ int, cacheFit bool) *BlockPos {
+	var newNode *BlockPos
 
 	// can we drop down here? (check this before the same-z move)
-	newNode := view.blockPos[node.x+dx][node.y+dy][node.z-1]
-	if view.isFitOk(newNode, startWorldX, startWorldY, startWorldZ) {
+	z := startWorldZ
+	for z > 0 {
+		newNode = view.blockPos[newViewX][newViewY][z-1]
+		if !view.isFitOk(newNode, startWorldX, startWorldY, startWorldZ, cacheFit) {
+			break
+		}
+		z--
+	}
+	if z < startWorldZ {
 		return newNode
 	}
 
 	// same z move
-	newNode = view.blockPos[node.x+dx][node.y+dy][node.z]
-	if view.isFitOk(newNode, startWorldX, startWorldY, startWorldZ) {
+	newNode = view.blockPos[newViewX][newViewY][startWorldZ]
+	if view.isFitOk(newNode, startWorldX, startWorldY, startWorldZ, cacheFit) {
 		return newNode
 	}
 
 	// step up?
-	newNode = view.blockPos[node.x+dx][node.y+dy][node.z+1]
-	if view.isFitOk(newNode, startWorldX, startWorldY, startWorldZ) {
+	newNode = view.blockPos[newViewX][newViewY][startWorldZ+1]
+	if view.isFitOk(newNode, startWorldX, startWorldY, startWorldZ, cacheFit) {
 		return newNode
 	}
 	return nil
 }
 
-func (view *View) isFitOk(node *BlockPos, startWorldX, startWorldY, startWorldZ int) bool {
-	if !node.pathNode.fitCalled {
-		node.pathNode.fitCalled = true
-		wx, wy, wz := view.toWorldPos(node.x, node.y, node.z)
-		node.pathNode.blocked = view.Fits(wx, wy, wz, startWorldX, startWorldY, startWorldZ)
+func (view *View) isFitOk(node *BlockPos, startWorldX, startWorldY, startWorldZ int, cacheFit bool) bool {
+	if cacheFit {
+		if !node.pathNode.fitCalled {
+			node.pathNode.fitCalled = true
+			node.pathNode.blocked = view.Fits(
+				node.worldX, node.worldY, node.worldZ,
+				startWorldX, startWorldY, startWorldZ)
+		}
+		return node.pathNode.blocked
+	} else {
+		return view.Fits(
+			node.worldX, node.worldY, node.worldZ,
+			startWorldX, startWorldY, startWorldZ)
 	}
-	return node.pathNode.blocked
 }
 
 func (view *View) generatePath(currentNode *BlockPos) []PathStep {
