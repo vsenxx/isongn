@@ -59,6 +59,7 @@ type Shape struct {
 	SwayEnabled    bool
 	BobEnabled     bool
 	BreatheEnabled bool
+	NoSupport      bool
 	IsExtra        bool
 }
 
@@ -211,6 +212,9 @@ func (shape *Shape) addExtras(shapeDef map[string]interface{}) {
 	}
 	if bob, ok := shapeDef["breathe"].(bool); ok {
 		shape.BreatheEnabled = bob
+	}
+	if bob, ok := shapeDef["nosupport"].(bool); ok {
+		shape.NoSupport = bob
 	}
 	// extra
 	if extra, ok := shapeDef["extra"].(bool); ok {

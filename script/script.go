@@ -148,8 +148,9 @@ func moveShape(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	z := int(arg[2].(float64))
 	nx := int(arg[3].(float64))
 	ny := int(arg[4].(float64))
+	isFlying := arg[5].(bool)
 	app := ctx.App["app"].(*gfx.App)
-	return float64(app.View.MoveShape(x, y, z, nx, ny)), nil
+	return float64(app.View.MoveShape(x, y, z, nx, ny, isFlying)), nil
 }
 
 func setOffset(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
@@ -182,17 +183,6 @@ func setAnimation(ctx *bscript.Context, arg ...interface{}) (interface{}, error)
 	app := ctx.App["app"].(*gfx.App)
 	app.View.SetShapeAnimation(x, y, z, shapes.AnimationNames[name], shapes.Direction(dir), animationSpeed)
 	return nil, nil
-}
-
-func fits(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
-	tx := int(arg[0].(float64))
-	ty := int(arg[1].(float64))
-	tz := int(arg[2].(float64))
-	fx := int(arg[3].(float64))
-	fy := int(arg[4].(float64))
-	fz := int(arg[5].(float64))
-	app := ctx.App["app"].(*gfx.App)
-	return app.View.Fits(tx, ty, tz, fx, fy, fz), nil
 }
 
 func isEmpty(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
@@ -359,8 +349,9 @@ func findPath(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	ex := int(arg[3].(float64))
 	ey := int(arg[4].(float64))
 	ez := int(arg[5].(float64))
+	isFlying := arg[6].(bool)
 	app := ctx.App["app"].(*gfx.App)
-	path := app.View.FindPath(sx, sy, sz, ex, ey, ez)
+	path := app.View.FindPath(sx, sy, sz, ex, ey, ez, isFlying)
 	if path == nil {
 		return nil, nil
 	} else {
@@ -525,7 +516,6 @@ func InitScript() {
 	bscript.AddBuiltin("eraseAllExtras", eraseAllExtras)
 	bscript.AddBuiltin("setAnimation", setAnimation)
 	bscript.AddBuiltin("setOffset", setOffset)
-	bscript.AddBuiltin("fits", fits)
 	bscript.AddBuiltin("isEmpty", isEmpty)
 	bscript.AddBuiltin("moveViewTo", moveViewTo)
 	bscript.AddBuiltin("fadeViewTo", fadeViewTo)

@@ -31,11 +31,12 @@ const EXTRA_SIZE = 8
 var ZERO_OFFSET [2]float32
 
 type PathNode struct {
-	f, g, h            int
-	visited, closed    bool
-	blocked, fitCalled bool
-	debug              string
-	parent             *BlockPos
+	f, g, h         int
+	visited, closed bool
+	fitCalled       bool
+	blocker         *BlockPos
+	debug           string
+	parent          *BlockPos
 }
 
 // BlockPos is a displayed Shape at a location
@@ -472,22 +473,25 @@ func (view *View) GetShape(worldX, worldY, worldZ int) (int, int, int, int, bool
 	return b.block.shape.Index, originWorldX, originWorldY, originWorldZ, true
 }
 
-func (view *View) Fits(toWorldX, toWorldY, toWorldZ int, fromWorldX, fromWorldY, fromWorldZ int) bool {
+func (view *View) GetBlocker(toWorldX, toWorldY, toWorldZ int, fromWorldX, fromWorldY, fromWorldZ int) *BlockPos {
 	viewX, viewY, viewZ, validPos := view.toViewPos(fromWorldX, fromWorldY, fromWorldZ)
 	if !validPos {
-		return false
+		print("WARN: View.GetBlocker src position invalid")
+		return nil
 	}
 	src := view.blockPos[viewX][viewY][viewZ]
 	if src.block == nil {
-		return false
+		print("WARN: View.GetBlocker src position empty")
+		return nil
 	}
 
 	toViewX, toViewY, toViewZ, validPos := view.toViewPos(toWorldX, toWorldY, toWorldZ)
 	if !validPos {
-		return false
+		print("WARN: View.GetBlocker dest position invalid")
+		return nil
 	}
 
-	fits := true
+	var blocker *BlockPos
 	oldViewX := src.box.X
 	oldViewY := src.box.Y
 	oldViewZ := src.box.Z
@@ -498,13 +502,13 @@ func (view *View) Fits(toWorldX, toWorldY, toWorldZ int, fromWorldX, fromWorldY,
 		// 	fmt.Printf("\tshape=%s at=%d,%d\n", bp.block.shape.Name, bp.x, bp.y)
 		// }
 		if bp != src && bp.box.intersect(&src.box) {
-			fits = false
+			blocker = bp
 			return true
 		}
 		return false
 	})
 	src.box.SetPos(oldViewX, oldViewY, oldViewZ)
-	return fits
+	return blocker
 }
 
 func (view *View) FitsSlow(toWorldX, toWorldY, toWorldZ int, fromWorldX, fromWorldY, fromWorldZ int) bool {
@@ -566,14 +570,14 @@ func (view *View) FindTop(worldX, worldY int, shape *shapes.Shape) int {
 
 // Move a shape from (worldX, worldY, worldZ) to a new position of (newWorldX, newWorldY).
 // Returns the new Z value, or -1 if the shape won't fit.
-func (view *View) MoveShape(worldX, worldY, worldZ, newWorldX, newWorldY int) int {
+func (view *View) MoveShape(worldX, worldY, worldZ, newWorldX, newWorldY int, isFlying bool) int {
 	newViewX, newViewY, _, validPos := view.toViewPos(newWorldX, newWorldY, 0)
 	if !validPos {
 		return -1
 	}
 
 	// figure out the new Z
-	bp := view.tryMove(newViewX, newViewY, worldX, worldY, worldZ, false)
+	bp := view.tryMove(newViewX, newViewY, worldX, worldY, worldZ, false, isFlying)
 
 	// move
 	if bp != nil {
@@ -860,11 +864,11 @@ func (view *View) SetDaylight(r, g, b, a float32) {
 
 type PathStep [3]int
 
-func (view *View) FindPath(sx, sy, sz, ex, ey, ez int) []PathStep {
+func (view *View) FindPath(sx, sy, sz, ex, ey, ez int, isFlying bool) []PathStep {
 	startViewX, startViewY, startViewZ, startOk := view.toViewPos(sx, sy, sz)
 	endViewX, endViewY, endViewZ, endOk := view.toViewPos(ex, ey, ez)
 	if startOk && endOk {
-		return view.findPath(startViewX, startViewY, startViewZ, endViewX, endViewY, endViewZ, sx, sy, sz)
+		return view.findPath(startViewX, startViewY, startViewZ, endViewX, endViewY, endViewZ, sx, sy, sz, isFlying)
 	}
 	return nil
 }
@@ -882,7 +886,7 @@ func (view *View) FindPath(sx, sy, sz, ex, ey, ez int) []PathStep {
     It has since been replaced with astar.js which uses a Binary Heap and is quite faster, but I am leaving
     it here since it is more strictly following pseudocode for the Astar search
 */
-func (view *View) findPath(startViewX, startViewY, startViewZ, endViewX, endViewY, endViewZ, startWorldX, startWorldY, startWorldZ int) []PathStep {
+func (view *View) findPath(startViewX, startViewY, startViewZ, endViewX, endViewY, endViewZ, startWorldX, startWorldY, startWorldZ int, isFlying bool) []PathStep {
 	view.resetPathFind()
 	end := view.blockPos[endViewX][endViewY][endViewZ]
 	openList := []*BlockPos{view.blockPos[startViewX][startViewY][startViewZ]}
@@ -908,7 +912,7 @@ func (view *View) findPath(startViewX, startViewY, startViewZ, endViewX, endView
 
 		// fmt.Printf("Processing: %d,%d,%d. List len=%d\n", currentNode.x, currentNode.y, currentNode.z, len(openList))
 
-		neighbors := view.astarNeighbors(currentNode, startWorldX, startWorldY, startWorldZ)
+		neighbors := view.astarNeighbors(currentNode, startWorldX, startWorldY, startWorldZ, isFlying)
 		for _, neighbor := range neighbors {
 			// process only valid nodes
 			if !neighbor.pathNode.closed {
@@ -954,47 +958,51 @@ func heuristic(pos0, pos1 *BlockPos) int {
 	return d1 + d2 + d3
 }
 
-func (view *View) astarNeighbors(node *BlockPos, startWorldX, startWorldY, startWorldZ int) []*BlockPos {
+func (view *View) astarNeighbors(node *BlockPos, startWorldX, startWorldY, startWorldZ int, isFlying bool) []*BlockPos {
 	ret := []*BlockPos{}
 	if node.x-1 >= 0 {
-		if newNode := view.tryInDir(node, -1, 0, startWorldX, startWorldY, startWorldZ); newNode != nil {
+		if newNode := view.tryInDir(node, -1, 0, startWorldX, startWorldY, startWorldZ, isFlying); newNode != nil {
 			ret = append(ret, newNode)
 		}
 	}
 	if node.x+1 < SIZE {
-		if newNode := view.tryInDir(node, 1, 0, startWorldX, startWorldY, startWorldZ); newNode != nil {
+		if newNode := view.tryInDir(node, 1, 0, startWorldX, startWorldY, startWorldZ, isFlying); newNode != nil {
 			ret = append(ret, newNode)
 		}
 	}
 	if node.y-1 >= 0 {
-		if newNode := view.tryInDir(node, 0, -1, startWorldX, startWorldY, startWorldZ); newNode != nil {
+		if newNode := view.tryInDir(node, 0, -1, startWorldX, startWorldY, startWorldZ, isFlying); newNode != nil {
 			ret = append(ret, newNode)
 		}
 	}
 	if node.y+1 < SIZE {
-		if newNode := view.tryInDir(node, 0, 1, startWorldX, startWorldY, startWorldZ); newNode != nil {
+		if newNode := view.tryInDir(node, 0, 1, startWorldX, startWorldY, startWorldZ, isFlying); newNode != nil {
 			ret = append(ret, newNode)
 		}
 	}
 	return ret
 }
 
-func (view *View) tryInDir(node *BlockPos, dx, dy, startWorldX, startWorldY, startWorldZ int) *BlockPos {
-	return view.tryMove(node.x+dx, node.y+dy, startWorldX, startWorldY, startWorldZ, true)
+func (view *View) tryInDir(node *BlockPos, dx, dy, startWorldX, startWorldY, startWorldZ int, isFlying bool) *BlockPos {
+	return view.tryMove(node.x+dx, node.y+dy, startWorldX, startWorldY, startWorldZ, true, isFlying)
 }
 
-// todo: take into account water/lava
-func (view *View) tryMove(newViewX, newViewY, startWorldX, startWorldY, startWorldZ int, cacheFit bool) *BlockPos {
+func (view *View) tryMove(newViewX, newViewY, startWorldX, startWorldY, startWorldZ int, cacheFit, isFlying bool) *BlockPos {
 	var newNode *BlockPos
 
 	// can we drop down here? (check this before the same-z move)
 	z := startWorldZ
+	var standingOn *BlockPos
 	for z > 0 {
 		newNode = view.blockPos[newViewX][newViewY][z-1]
-		if !view.isFitOk(newNode, startWorldX, startWorldY, startWorldZ, cacheFit) {
+		standingOn = view.getBlocker(newNode, startWorldX, startWorldY, startWorldZ, cacheFit)
+		if standingOn != nil {
 			break
 		}
 		z--
+	}
+	if !isFlying && standingOn != nil && standingOn.block.shape.NoSupport {
+		return nil
 	}
 	if z < startWorldZ {
 		return newNode
@@ -1002,29 +1010,29 @@ func (view *View) tryMove(newViewX, newViewY, startWorldX, startWorldY, startWor
 
 	// same z move
 	newNode = view.blockPos[newViewX][newViewY][startWorldZ]
-	if view.isFitOk(newNode, startWorldX, startWorldY, startWorldZ, cacheFit) {
+	if view.getBlocker(newNode, startWorldX, startWorldY, startWorldZ, cacheFit) == nil {
 		return newNode
 	}
 
 	// step up?
 	newNode = view.blockPos[newViewX][newViewY][startWorldZ+1]
-	if view.isFitOk(newNode, startWorldX, startWorldY, startWorldZ, cacheFit) {
+	if view.getBlocker(newNode, startWorldX, startWorldY, startWorldZ, cacheFit) == nil {
 		return newNode
 	}
 	return nil
 }
 
-func (view *View) isFitOk(node *BlockPos, startWorldX, startWorldY, startWorldZ int, cacheFit bool) bool {
+func (view *View) getBlocker(node *BlockPos, startWorldX, startWorldY, startWorldZ int, cacheFit bool) *BlockPos {
 	if cacheFit {
 		if !node.pathNode.fitCalled {
 			node.pathNode.fitCalled = true
-			node.pathNode.blocked = view.Fits(
+			node.pathNode.blocker = view.GetBlocker(
 				node.worldX, node.worldY, node.worldZ,
 				startWorldX, startWorldY, startWorldZ)
 		}
-		return node.pathNode.blocked
+		return node.pathNode.blocker
 	} else {
-		return view.Fits(
+		return view.GetBlocker(
 			node.worldX, node.worldY, node.worldZ,
 			startWorldX, startWorldY, startWorldZ)
 	}
@@ -1061,7 +1069,7 @@ func (view *View) resetPathFind() {
 				blockPos.pathNode.f = 0
 				blockPos.pathNode.g = 0
 				blockPos.pathNode.h = 0
-				blockPos.pathNode.blocked = false
+				blockPos.pathNode.blocker = nil
 				blockPos.pathNode.fitCalled = false
 				blockPos.pathNode.visited = false
 				blockPos.pathNode.closed = false
