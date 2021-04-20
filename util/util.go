@@ -115,3 +115,10 @@ func Linear(a, b, percent float32) float32 {
 func Clamp(value, min, max float32) float32 {
 	return float32(math.Max(float64(min), math.Min(float64(value), float64(max))))
 }
+
+func AbsInt(x int) int {
+	if x < 0 {
+		return -1 * x
+	}
+	return x
+}

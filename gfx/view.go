@@ -9,6 +9,7 @@ import (
 	"github.com/go-gl/gl/all-core/gl"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/uzudil/isongn/shapes"
+	"github.com/uzudil/isongn/util"
 	"github.com/uzudil/isongn/world"
 )
 
@@ -476,18 +477,18 @@ func (view *View) GetShape(worldX, worldY, worldZ int) (int, int, int, int, bool
 func (view *View) GetBlocker(toWorldX, toWorldY, toWorldZ int, fromWorldX, fromWorldY, fromWorldZ int) *BlockPos {
 	viewX, viewY, viewZ, validPos := view.toViewPos(fromWorldX, fromWorldY, fromWorldZ)
 	if !validPos {
-		print("WARN: View.GetBlocker src position invalid")
+		print("WARN: View.GetBlocker src position invalid\n")
 		return nil
 	}
 	src := view.blockPos[viewX][viewY][viewZ]
 	if src.block == nil {
-		print("WARN: View.GetBlocker src position empty")
+		print("WARN: View.GetBlocker src position empty\n")
 		return nil
 	}
 
 	toViewX, toViewY, toViewZ, validPos := view.toViewPos(toWorldX, toWorldY, toWorldZ)
 	if !validPos {
-		print("WARN: View.GetBlocker dest position invalid")
+		print("WARN: View.GetBlocker dest position invalid\n")
 		return nil
 	}
 
@@ -577,7 +578,7 @@ func (view *View) MoveShape(worldX, worldY, worldZ, newWorldX, newWorldY int, is
 	}
 
 	// figure out the new Z
-	bp := view.tryMove(newViewX, newViewY, worldX, worldY, worldZ, false, isFlying)
+	bp := view.tryMove(newViewX, newViewY, worldZ, worldX, worldY, worldZ, false, isFlying)
 
 	// move
 	if bp != nil {
@@ -952,9 +953,9 @@ func (view *View) findPath(startViewX, startViewY, startViewZ, endViewX, endView
 
 func heuristic(pos0, pos1 *BlockPos) int {
 	// Manhattan distance. See list of heuristics: http://theory.stanford.edu/~amitp/GameProgramming/Heuristics.html
-	d1 := int(math.Abs(float64(pos1.x - pos0.x)))
-	d2 := int(math.Abs(float64(pos1.y - pos0.y)))
-	d3 := int(math.Abs(float64(pos1.z - pos0.z)))
+	d1 := util.AbsInt(pos1.x - pos0.x)
+	d2 := util.AbsInt(pos1.y - pos0.y)
+	d3 := util.AbsInt(pos1.z - pos0.z)
 	return d1 + d2 + d3
 }
 
@@ -984,14 +985,14 @@ func (view *View) astarNeighbors(node *BlockPos, startWorldX, startWorldY, start
 }
 
 func (view *View) tryInDir(node *BlockPos, dx, dy, startWorldX, startWorldY, startWorldZ int, isFlying bool) *BlockPos {
-	return view.tryMove(node.x+dx, node.y+dy, startWorldX, startWorldY, startWorldZ, true, isFlying)
+	return view.tryMove(node.x+dx, node.y+dy, node.z, startWorldX, startWorldY, startWorldZ, true, isFlying)
 }
 
-func (view *View) tryMove(newViewX, newViewY, startWorldX, startWorldY, startWorldZ int, cacheFit, isFlying bool) *BlockPos {
+func (view *View) tryMove(newViewX, newViewY, newViewZ, startWorldX, startWorldY, startWorldZ int, cacheFit, isFlying bool) *BlockPos {
 	var newNode *BlockPos
 
 	// can we drop down here? (check this before the same-z move)
-	z := startWorldZ
+	z := newViewZ
 	var standingOn *BlockPos
 	for z > 0 {
 		newNode = view.blockPos[newViewX][newViewY][z-1]
@@ -1004,19 +1005,19 @@ func (view *View) tryMove(newViewX, newViewY, startWorldX, startWorldY, startWor
 	if !isFlying && standingOn != nil && standingOn.block.shape.NoSupport {
 		return nil
 	}
-	if z < startWorldZ {
+	if z < newViewZ {
 		return newNode
 	}
 
 	// same z move
-	newNode = view.blockPos[newViewX][newViewY][startWorldZ]
+	newNode = view.blockPos[newViewX][newViewY][newViewZ]
 	if view.getBlocker(newNode, startWorldX, startWorldY, startWorldZ, cacheFit) == nil {
 		return newNode
 	}
 
 	// step up?
-	newNode = view.blockPos[newViewX][newViewY][startWorldZ+1]
-	if view.getBlocker(newNode, startWorldX, startWorldY, startWorldZ, cacheFit) == nil {
+	newNode = view.blockPos[newViewX][newViewY][newViewZ+1]
+	if b := view.getBlocker(newNode, startWorldX, startWorldY, startWorldZ, cacheFit); b == nil {
 		return newNode
 	}
 	return nil

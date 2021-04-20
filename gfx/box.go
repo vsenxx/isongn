@@ -36,19 +36,6 @@ func (a *BoundingBox) intersect(b *BoundingBox) bool {
 		sideOverlap(a.Z, a.Z+a.D, b.Z, b.Z+b.D)
 }
 
-// func (a *BoundingBox) intersect(b *BoundingBox) bool {
-// 	return (absInt((a.X+a.W/2)-(b.X+b.W/2))*2 < (a.W + b.W)) &&
-// 		(absInt((a.Y+a.H/2)-(b.Y+b.H/2))*2 < (a.H + b.H)) &&
-// 		(absInt((a.Z+a.D/2)-(b.Z+b.D/2))*2 < (a.D + b.D))
-// }
-
-func absInt(x int) int {
-	if x < 0 {
-		return -1 * x
-	}
-	return x
-}
-
 func (bp *BoundingBox) describe() string {
 	return fmt.Sprintf("%d,%d,%d-%d,%d,%d", bp.X, bp.Y, bp.Z, bp.X+bp.W, bp.Y+bp.H, bp.Z+bp.D)
 }
