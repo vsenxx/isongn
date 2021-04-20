@@ -44,6 +44,7 @@ type BlockPos struct {
 	x, y, z                int
 	worldX, worldY, worldZ int
 	block                  *Block
+	box                    BoundingBox
 	extras                 [EXTRA_SIZE]*Block
 	dir                    shapes.Direction
 	animationTimer         float64
@@ -385,11 +386,14 @@ func (view *View) toWorldPos(viewX, viewY, viewZ int) (int, int, int) {
 	return viewX + (view.Loader.X - SIZE/2), viewY + (view.Loader.Y - SIZE/2), viewZ
 }
 
+func (view *View) isValidViewPos(viewX, viewY, viewZ int) bool {
+	return !(viewX < 0 || viewX >= SIZE || viewY < 0 || viewY >= SIZE || viewZ < 0 || viewZ >= world.SECTION_Z_SIZE)
+}
+
 func (view *View) toViewPos(worldX, worldY, worldZ int) (int, int, int, bool) {
 	viewX := worldX - (view.Loader.X - SIZE/2)
 	viewY := worldY - (view.Loader.Y - SIZE/2)
-	invalidPos := viewX < 0 || viewX >= SIZE || viewY < 0 || viewY >= SIZE || worldZ < 0 || worldZ >= world.SECTION_Z_SIZE
-	return viewX, viewY, worldZ, !invalidPos
+	return viewX, viewY, worldZ, view.isValidViewPos(viewX, viewY, worldZ)
 }
 
 func (view *View) toScreenPos(worldX, worldY, worldZ int, viewWidth, viewHeight int) (int, int, bool) {
@@ -423,27 +427,36 @@ func (view *View) InView(worldX, worldY, worldZ int) bool {
 	return validPos
 }
 
-const SEARCH_SIZE = 8
+const SEARCH_SIZE = 16
 
-func (view *View) getShapeAt(viewX, viewY, viewZ int) *BlockPos {
+func (view *View) search(viewX, viewY, viewZ int, fx func(*BlockPos) bool) {
 	for x := 0; x < SEARCH_SIZE; x++ {
 		for y := 0; y < SEARCH_SIZE; y++ {
 			for z := 0; z < SEARCH_SIZE; z++ {
 				vx := viewX - x
 				vy := viewY - y
 				vz := viewZ - z
-				if vx >= 0 && vx < SIZE && vy >= 0 && vy < SIZE && vz >= 0 && vz < world.SECTION_Z_SIZE {
+				if view.isValidViewPos(vx, vy, vz) {
 					bp := view.blockPos[vx][vy][vz]
-					if bp.block != nil {
-						if vx+int(bp.block.sizeX) > viewX && vy+int(bp.block.sizeY) > viewY && vz+int(bp.block.sizeZ) > viewZ {
-							return bp
-						}
+					if bp.block != nil && fx(bp) {
+						return
 					}
 				}
 			}
 		}
 	}
-	return nil
+}
+
+func (view *View) getShapeAt(viewX, viewY, viewZ int) *BlockPos {
+	var res *BlockPos
+	view.search(viewX, viewY, viewZ, func(bp *BlockPos) bool {
+		if bp.box.isInside(viewX, viewY, viewZ) {
+			res = bp
+			return true
+		}
+		return false
+	})
+	return res
 }
 
 func (view *View) GetShape(worldX, worldY, worldZ int) (int, int, int, int, bool) {
@@ -460,6 +473,41 @@ func (view *View) GetShape(worldX, worldY, worldZ int) (int, int, int, int, bool
 }
 
 func (view *View) Fits(toWorldX, toWorldY, toWorldZ int, fromWorldX, fromWorldY, fromWorldZ int) bool {
+	viewX, viewY, viewZ, validPos := view.toViewPos(fromWorldX, fromWorldY, fromWorldZ)
+	if !validPos {
+		return false
+	}
+	src := view.blockPos[viewX][viewY][viewZ]
+	if src.block == nil {
+		return false
+	}
+
+	toViewX, toViewY, toViewZ, validPos := view.toViewPos(toWorldX, toWorldY, toWorldZ)
+	if !validPos {
+		return false
+	}
+
+	fits := true
+	oldViewX := src.box.X
+	oldViewY := src.box.Y
+	oldViewZ := src.box.Z
+	// fmt.Printf("src=%d,%d dest=%d,%d\n", src.x, src.y, toViewX, toViewY)
+	src.box.SetPos(toViewX, toViewY, toViewZ)
+	view.search(toViewX+int(src.block.sizeX), toViewY+int(src.block.sizeY), toViewZ+int(src.block.sizeZ), func(bp *BlockPos) bool {
+		// if bp.block.sizeZ > 1 {
+		// 	fmt.Printf("\tshape=%s at=%d,%d\n", bp.block.shape.Name, bp.x, bp.y)
+		// }
+		if bp != src && bp.box.intersect(&src.box) {
+			fits = false
+			return true
+		}
+		return false
+	})
+	src.box.SetPos(oldViewX, oldViewY, oldViewZ)
+	return fits
+}
+
+func (view *View) FitsSlow(toWorldX, toWorldY, toWorldZ int, fromWorldX, fromWorldY, fromWorldZ int) bool {
 	shapeIndex, ox, oy, oz, validPos := view.GetShape(fromWorldX, fromWorldY, fromWorldZ)
 	if validPos == false {
 		return false
@@ -550,6 +598,7 @@ func (view *View) setShapeInner(worldX, worldY, worldZ int, shapeIndex int, hasS
 			blockPos.model.Set(0, 3, float32(viewX-SIZE/2)+shape.Offset[0])
 			blockPos.model.Set(1, 3, float32(viewY-SIZE/2)+shape.Offset[1])
 			blockPos.model.Set(2, 3, float32(viewZ)+shape.Offset[2])
+			blockPos.box.Set(viewX, viewY, viewZ, int(blockPos.block.sizeX), int(blockPos.block.sizeY), int(blockPos.block.sizeZ))
 		} else {
 			blockPos.block = nil
 		}
