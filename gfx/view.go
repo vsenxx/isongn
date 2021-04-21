@@ -93,9 +93,9 @@ type View struct {
 }
 
 const viewSize = 10
-const SIZE = 128
-const DRAW_SIZE = 64
-const VIEW_BORDER = 8
+const SIZE = 96
+const DRAW_SIZE = 48
+const SEARCH_SIZE = 16
 
 func getProjection(zoom float32, shear [3]float32) mgl32.Mat4 {
 	projection := mgl32.Ortho(-viewSize*zoom*0.95, viewSize*zoom*0.95, -viewSize*zoom*0.95, viewSize*zoom*0.95, -viewSize*zoom*2, viewSize*zoom*2)
@@ -419,17 +419,10 @@ func (view *View) toScreenPos(worldX, worldY, worldZ int, viewWidth, viewHeight 
 	return 0, 0, false
 }
 
-func (view *View) Inside(worldX, worldY int) bool {
-	vx, vy, _, validPos := view.toViewPos(worldX, worldY, 1)
-	return validPos && vx >= VIEW_BORDER && vx < SIZE-VIEW_BORDER && vy >= VIEW_BORDER && vy < SIZE-VIEW_BORDER
-}
-
 func (view *View) InView(worldX, worldY, worldZ int) bool {
 	_, _, _, validPos := view.toViewPos(worldX, worldY, worldZ)
 	return validPos
 }
-
-const SEARCH_SIZE = 16
 
 func (view *View) search(viewX, viewY, viewZ int, fx func(*BlockPos) bool) {
 	for x := 0; x < SEARCH_SIZE; x++ {
@@ -492,78 +485,53 @@ func (view *View) GetBlocker(toWorldX, toWorldY, toWorldZ int, fromWorldX, fromW
 		return nil
 	}
 
-	var blocker *BlockPos
-	oldViewX := src.box.X
-	oldViewY := src.box.Y
-	oldViewZ := src.box.Z
+	return view.getBlockerAt(toViewX, toViewY, toViewZ, &src.box, src)
+}
+
+func (view *View) getBlockerAt(toViewX, toViewY, toViewZ int, box *BoundingBox, src *BlockPos) *BlockPos {
+	oldViewX := box.X
+	oldViewY := box.Y
+	oldViewZ := box.Z
 	// fmt.Printf("src=%d,%d dest=%d,%d\n", src.x, src.y, toViewX, toViewY)
-	src.box.SetPos(toViewX, toViewY, toViewZ)
-	view.search(toViewX+int(src.block.sizeX), toViewY+int(src.block.sizeY), toViewZ+int(src.block.sizeZ), func(bp *BlockPos) bool {
+	box.SetPos(toViewX, toViewY, toViewZ)
+
+	var blocker *BlockPos
+	view.search(toViewX+box.W, toViewY+box.H, toViewZ+box.D, func(bp *BlockPos) bool {
 		// if bp.block.sizeZ > 1 {
 		// 	fmt.Printf("\tshape=%s at=%d,%d\n", bp.block.shape.Name, bp.x, bp.y)
 		// }
-		if bp != src && bp.box.intersect(&src.box) {
+		if bp != src && bp.box.intersect(box) {
 			blocker = bp
 			return true
 		}
 		return false
 	})
-	src.box.SetPos(oldViewX, oldViewY, oldViewZ)
+	box.SetPos(oldViewX, oldViewY, oldViewZ)
 	return blocker
 }
 
-func (view *View) FitsSlow(toWorldX, toWorldY, toWorldZ int, fromWorldX, fromWorldY, fromWorldZ int) bool {
-	shapeIndex, ox, oy, oz, validPos := view.GetShape(fromWorldX, fromWorldY, fromWorldZ)
-	if validPos == false {
+func (view *View) IsEmpty(toWorldX, toWorldY, toWorldZ int, shape *shapes.Shape) bool {
+	viewX, viewY, viewZ, validPos := view.toViewPos(toWorldX, toWorldY, toWorldZ)
+	if !validPos {
 		return false
 	}
-	shape := shapes.Shapes[shapeIndex]
-
-	fits := true
-	shape.Traverse(func(x, y, z int) bool {
-		viewX, viewY, viewZ, validPos := view.toViewPos(toWorldX+x, toWorldY+y, toWorldZ+z)
-		if validPos {
-			b := view.getShapeAt(viewX, viewY, viewZ)
-			if b != nil && b.block != nil {
-				wx, wy, wz := view.toWorldPos(b.x, b.y, b.z)
-				// a shape is uniquely identified by its world coords (not its shape index)
-				if !(wx == ox && wy == oy && wz == oz) {
-					fits = false
-					return true
-				}
-			}
-		}
-		return false
-	})
-	return fits
-}
-
-func (view *View) IsEmpty(toWorldX, toWorldY, toWorldZ int, shape *shapes.Shape) bool {
-	fits := true
-	shape.Traverse(func(x, y, z int) bool {
-		viewX, viewY, viewZ, validPos := view.toViewPos(toWorldX+x, toWorldY+y, toWorldZ+z)
-		if validPos {
-			b := view.getShapeAt(viewX, viewY, viewZ)
-			if b != nil && b.block != nil {
-				fits = false
-				return true
-			}
-		}
-		return false
-	})
-	return fits
+	box := &BoundingBox{0, 0, 0, int(shape.Size[0]), int(shape.Size[1]), int(shape.Size[2])}
+	return view.getBlockerAt(viewX, viewY, viewZ, box, nil) == nil
 }
 
 func (view *View) FindTop(worldX, worldY int, shape *shapes.Shape) int {
 	maxZ := 0
-	for x := 0; x < int(shape.Size[0]); x++ {
-		for y := 0; y < int(shape.Size[1]); y++ {
-			for z := view.maxZ - 1; z >= 0; z-- {
-				_, _, _, _, found := view.GetShape(worldX+x, worldY+y, z)
-				if found && z+1 > maxZ {
+	viewX, viewY, _, validPos := view.toViewPos(worldX, worldY, maxZ)
+	if validPos {
+		box := &BoundingBox{0, 0, 0, int(shape.Size[0]), int(shape.Size[1]), int(shape.Size[2])}
+		for z := view.maxZ - 1; z >= 0; z-- {
+			box.SetPos(viewX, viewY, z)
+			view.search(viewX+box.W, viewY+box.H, z+box.D, func(bp *BlockPos) bool {
+				if bp.box.intersect(box) && bp.z < view.maxZ && z+1 > maxZ {
 					maxZ = z + 1
 				}
-			}
+				return false
+			})
 		}
 	}
 	return maxZ
@@ -582,7 +550,7 @@ func (view *View) MoveShape(worldX, worldY, worldZ, newWorldX, newWorldY int, is
 
 	// move
 	if bp != nil {
-		blockPos, shapeIndex := view.EraseShape(worldX, worldY, worldZ)
+		blockPos, shapeIndex := view.EraseShapeExact(worldX, worldY, worldZ)
 		if blockPos != nil {
 			view.SetShape(newWorldX, newWorldY, bp.z, shapeIndex)
 		}
@@ -594,6 +562,20 @@ func (view *View) MoveShape(worldX, worldY, worldZ, newWorldX, newWorldY int, is
 func (view *View) SetShape(worldX, worldY, worldZ int, shapeIndex int) *BlockPos {
 	view.Loader.SetShape(worldX, worldY, worldZ, shapeIndex)
 	return view.setShapeInner(worldX, worldY, worldZ, shapeIndex, true)
+}
+
+func (view *View) EraseShapeExact(worldX, worldY, worldZ int) (*BlockPos, int) {
+	viewX, viewY, viewZ, validPos := view.toViewPos(worldX, worldY, worldZ)
+	if validPos {
+		view.Loader.EraseShape(worldX, worldY, worldZ)
+		blockPos := view.blockPos[viewX][viewY][viewZ]
+		if blockPos.block != nil {
+			shapeIndex := blockPos.block.shape.Index
+			blockPos.block = nil
+			return blockPos, shapeIndex
+		}
+	}
+	return nil, 0
 }
 
 func (view *View) EraseShape(worldX, worldY, worldZ int) (*BlockPos, int) {
@@ -989,14 +971,11 @@ func (view *View) tryInDir(node *BlockPos, dx, dy, startWorldX, startWorldY, sta
 }
 
 func (view *View) tryMove(newViewX, newViewY, newViewZ, startWorldX, startWorldY, startWorldZ int, cacheFit, isFlying bool) *BlockPos {
-	var newNode *BlockPos
-
 	// can we drop down here? (check this before the same-z move)
 	z := newViewZ
 	var standingOn *BlockPos
 	for z > 0 {
-		newNode = view.blockPos[newViewX][newViewY][z-1]
-		standingOn = view.getBlocker(newNode, startWorldX, startWorldY, startWorldZ, cacheFit)
+		standingOn = view.getBlocker(view.blockPos[newViewX][newViewY][z-1], startWorldX, startWorldY, startWorldZ, cacheFit)
 		if standingOn != nil {
 			break
 		}
@@ -1006,18 +985,18 @@ func (view *View) tryMove(newViewX, newViewY, newViewZ, startWorldX, startWorldY
 		return nil
 	}
 	if z < newViewZ {
-		return newNode
+		return view.blockPos[newViewX][newViewY][z]
 	}
 
 	// same z move
-	newNode = view.blockPos[newViewX][newViewY][newViewZ]
+	newNode := view.blockPos[newViewX][newViewY][newViewZ]
 	if view.getBlocker(newNode, startWorldX, startWorldY, startWorldZ, cacheFit) == nil {
 		return newNode
 	}
 
 	// step up?
 	newNode = view.blockPos[newViewX][newViewY][newViewZ+1]
-	if b := view.getBlocker(newNode, startWorldX, startWorldY, startWorldZ, cacheFit); b == nil {
+	if view.getBlocker(newNode, startWorldX, startWorldY, startWorldZ, cacheFit) == nil {
 		return newNode
 	}
 	return nil

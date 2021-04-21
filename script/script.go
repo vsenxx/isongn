@@ -66,7 +66,7 @@ func isInView(ctx *bscript.Context, arg ...interface{}) (interface{}, error) {
 	x := int(arg[0].(float64))
 	y := int(arg[1].(float64))
 	app := ctx.App["app"].(*gfx.App)
-	return app.View.Inside(x, y), nil
+	return app.View.InView(x, y, 0), nil
 }
 
 func intersects(start, end, start2, end2 int) bool {
